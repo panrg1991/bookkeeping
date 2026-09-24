@@ -417,8 +417,11 @@ function downloadCsv(filename, rows) {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /* ================================ 导入 Excel ================================ */
@@ -745,6 +748,14 @@ function bindEvents() {
     downloadCsv(`流水记录_${state.year}_${state.month}.csv`, rows);
   });
 }
+
+// 只上报本应用脚本自身的错误：跨域脚本（如 IDE 预览注入的辅助脚本）只会给出
+// 脱敏后的 "Script error."，没有 filename，这里直接忽略，避免误报干扰。
+window.addEventListener('error', (event) => {
+  if (!event.filename || !event.filename.startsWith(location.origin)) return;
+  const file = event.filename.split('/').pop();
+  toast(`脚本错误：${event.message}（${file}:${event.lineno}）`, 'error');
+});
 
 (async function init() {
   $('#fDate').value = todayStr();
