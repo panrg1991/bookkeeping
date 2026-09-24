@@ -1,0 +1,17 @@
+{
+  "name": "bookkeeping",
+  "version": "1.0.0",
+  "private": true,
+  "description": "纯 JS 实现的财务记账统计软件：收入/支出/利润，按年、按月、按日统计，SQLite 存储",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --no-warnings server.js",
+    "dev": "node --no-warnings server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

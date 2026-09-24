@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>财务记账统计</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="logo">¥</span>
+      <div>
+        <h1>财务记账统计</h1>
+        <p>收入 · 支出 · 利润，Excel 式报表一览</p>
+      </div>
+    </div>
+    <div class="toolbar">
+      <label>年份
+        <select id="yearSelect"></select>
+      </label>
+      <label>月份
+        <select id="monthSelect"></select>
+      </label>
+      <button class="btn" id="reloadBtn" type="button">刷新</button>
+    </div>
+  </header>
+
+  <section class="cards" id="cards"></section>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab is-active" data-tab="month" type="button">月度总览</button>
+    <button class="tab" data-tab="daily" type="button">每日明细</button>
+    <button class="tab" data-tab="records" type="button">流水记录</button>
+    <button class="tab" data-tab="category" type="button">分类统计</button>
+  </nav>
+
+  <main>
+    <!-- 月度总览 -->
+    <section class="panel is-active" id="panel-month">
+      <div class="panel-head">
+        <h2>月度收支总览 <span class="muted" id="monthTitle"></span></h2>
+        <button class="btn ghost" id="exportMonthBtn" type="button">导出 CSV</button>
+      </div>
+      <div class="legend">
+        <span><i style="background:#16a34a"></i>收入</span>
+        <span><i style="background:#dc2626"></i>支出</span>
+      </div>
+      <div class="chart" id="monthChart"></div>
+      <div class="table-wrap">
+        <table class="grid" id="monthTable"></table>
+      </div>
+    </section>
+
+    <!-- 每日明细 -->
+    <section class="panel" id="panel-daily">
+      <div class="panel-head">
+        <h2>每日收支明细 <span class="muted" id="dailyTitle"></span></h2>
+        <div class="actions">
+          <span class="hint">点击任意一行可展开当天全部流水（可修改 / 删除）</span>
+          <button class="btn ghost" id="exportDailyBtn" type="button">导出 CSV</button>
+        </div>
+      </div>
+      <div class="chart" id="dailyChart"></div>
+      <div class="table-wrap">
+        <table class="grid" id="dailyTable"></table>
+      </div>
+    </section>
+
+    <!-- 流水记录 -->
+    <section class="panel" id="panel-records">
+      <form class="entry-form" id="recordForm" novalidate>
+        <div class="entry-head">
+          <div class="entry-title" id="entryTitle">记一笔</div>
+          <div class="entry-actions">
+            <button class="btn ghost" type="button" id="importBtn">导入 Excel</button>
+            <button class="btn ghost" type="button" id="sampleBtn">下载样例</button>
+          </div>
+        </div>
+        <input type="file" id="importFile" accept=".xlsx,.xls,.csv" hidden />
+        <div class="fields">
+          <label class="field">
+            <span>日期</span>
+            <input type="date" id="fDate" required />
+          </label>
+          <label class="field">
+            <span>类型</span>
+            <select id="fType">
+              <option value="expense">支出</option>
+              <option value="income">收入</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>金额（元）</span>
+            <input type="number" id="fAmount" step="0.01" min="0.01" placeholder="0.00" required />
+          </label>
+          <label class="field">
+            <span>分类</span>
+            <input type="text" id="fCategory" list="categoryList" placeholder="如：餐饮" />
+            <datalist id="categoryList"></datalist>
+          </label>
+          <label class="field grow">
+            <span>备注</span>
+            <input type="text" id="fNote" placeholder="选填，如：午餐" maxlength="200" />
+          </label>
+          <div class="field buttons">
+            <button class="btn primary" type="submit" id="submitBtn">保存记录</button>
+            <button class="btn ghost" type="button" id="cancelEditBtn" hidden>取消编辑</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="panel-head">
+        <h2>流水记录 <span class="muted" id="recordsTitle"></span></h2>
+        <div class="actions">
+          <select id="recordTypeFilter" class="mini-select">
+            <option value="all">全部类型</option>
+            <option value="expense">仅支出</option>
+            <option value="income">仅收入</option>
+          </select>
+          <input type="search" id="recordKeyword" class="mini-input" placeholder="搜索分类 / 备注" />
+          <button class="btn ghost" id="exportRecordBtn" type="button">导出 CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="grid" id="recordTable"></table>
+      </div>
+    </section>
+
+    <!-- 分类统计 -->
+    <section class="panel" id="panel-category">
+      <div class="panel-head">
+        <h2>分类统计 <span class="muted" id="categoryTitle"></span></h2>
+        <div class="segmented" id="categoryTypeSwitch">
+          <button class="seg is-active" data-ctype="expense" type="button">支出</button>
+          <button class="seg" data-ctype="income" type="button">收入</button>
+        </div>
+      </div>
+      <div id="categoryBody"></div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <div class="modal-mask" id="confirmModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-title" id="confirmTitle">确认操作</div>
+      <div class="modal-body" id="confirmText"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" id="confirmCancel">取消</button>
+        <button class="btn danger" type="button" id="confirmOk">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-mask" id="importModal" hidden>
+    <div class="modal modal-wide" role="dialog" aria-modal="true">
+      <div class="modal-title">导入预览</div>
+      <div class="modal-body" id="importPreview"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" id="importCancel">取消</button>
+        <button class="btn primary" type="button" id="importOk">确认导入</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./vendor/xlsx.full.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
