@@ -1,0 +1,4 @@
+node_modules/
+# CI 代码上传密钥，切勿提交
+private.*.key
+*.pem

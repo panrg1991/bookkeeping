@@ -12,6 +12,8 @@
 - **分类统计**：按支出或收入维度查看各分类金额与占比
 - **CSV 导出**：月度总览、每日明细、流水记录均可导出为 CSV（Excel 可直接打开）
 
+> **微信小程序版**：功能一致的实现位于 [`wechat-miniprogram/`](wechat-miniprogram/README.md)。小程序端使用微信本地存储（非 SQLite）、无服务端、不发起任何网络请求，页面通过 `utils/store.js` 本地函数调用完成读写与统计；数据存储与接口调用方式详见 [wechat-miniprogram/docs/data-and-api.md](wechat-miniprogram/docs/data-and-api.md)，发布上线流程（AppID / 密钥 / 审核）见 [wechat-miniprogram/docs/release.md](wechat-miniprogram/docs/release.md)。
+
 ## 运行
 
 要求 Node.js >= 22.5（使用内置的 `node:sqlite`，无需安装任何依赖）。
