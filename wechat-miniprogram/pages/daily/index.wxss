@@ -1,0 +1,127 @@
+.tip {
+  padding: 0 4rpx 16rpx;
+}
+
+.day-list {
+  padding-bottom: 20rpx;
+}
+
+.day-card {
+  background: #ffffff;
+  border-radius: 16rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(16, 24, 40, 0.06);
+  overflow: hidden;
+}
+
+.day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 24rpx 10rpx;
+}
+
+.day-left {
+  display: flex;
+  align-items: center;
+}
+
+.day-date {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-right: 16rpx;
+}
+
+.day-week {
+  font-size: 24rpx;
+  color: #6b7280;
+  margin-right: 16rpx;
+}
+
+.day-count {
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.day-arrow {
+  font-size: 22rpx;
+  color: #2563eb;
+}
+
+.day-body {
+  display: flex;
+  padding: 0 24rpx 20rpx;
+}
+
+.day-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.day-key {
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.day-value {
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-top: 4rpx;
+}
+
+.detail {
+  background: #f8fafc;
+  border-top: 2rpx solid #eef2f7;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 24rpx;
+  border-bottom: 2rpx solid #eef2f7;
+}
+
+.detail-main {
+  flex: 1;
+}
+
+.detail-line {
+  display: flex;
+  align-items: center;
+}
+
+.detail-cat {
+  font-size: 26rpx;
+  margin-left: 14rpx;
+}
+
+.detail-amount {
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-left: auto;
+  margin-right: 16rpx;
+}
+
+.detail-note {
+  font-size: 24rpx;
+  margin-top: 6rpx;
+}
+
+.detail-actions {
+  display: flex;
+}
+
+.mini-btn {
+  font-size: 24rpx;
+  color: #2563eb;
+  border: 2rpx solid #dbeafe;
+  border-radius: 8rpx;
+  padding: 6rpx 18rpx;
+  margin-left: 12rpx;
+}
+
+.mini-btn.danger {
+  color: #dc2626;
+  border-color: #fecaca;
+}

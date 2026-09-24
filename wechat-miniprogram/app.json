@@ -1,0 +1,41 @@
+{
+  "pages": [
+    "pages/monthly/index",
+    "pages/daily/index",
+    "pages/records/index",
+    "pages/category/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "backgroundColor": "#f4f6fb",
+    "navigationBarBackgroundColor": "#2563eb",
+    "navigationBarTitleText": "财务记账统计",
+    "navigationBarTextStyle": "white"
+  },
+  "tabBar": {
+    "color": "#6b7280",
+    "selectedColor": "#2563eb",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/monthly/index",
+        "text": "月度总览"
+      },
+      {
+        "pagePath": "pages/daily/index",
+        "text": "每日明细"
+      },
+      {
+        "pagePath": "pages/records/index",
+        "text": "流水记录"
+      },
+      {
+        "pagePath": "pages/category/index",
+        "text": "分类统计"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

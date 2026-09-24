@@ -1,0 +1,108 @@
+<view class="page">
+  <view class="toolbar">
+    <picker mode="selector" range="{{years}}" value="{{yearIndex}}" bindchange="onYearChange">
+      <view class="picker">{{year}} 年</view>
+    </picker>
+    <picker mode="selector" range="{{monthOptions}}" value="{{monthIndex}}" bindchange="onMonthChange">
+      <view class="picker">{{monthOptions[monthIndex]}}</view>
+    </picker>
+  </view>
+
+  <!-- 录入 / 编辑 -->
+  <view class="card {{editingId ? 'editing' : ''}}">
+    <view class="form-head">
+      <text class="card-title">{{editingId ? '修改记录 #' + editingId : '记一笔'}}</text>
+      <view class="form-head-actions">
+        <text class="link" bindtap="onToggleImport">{{showImport ? '收起导入' : '批量导入'}}</text>
+        <text class="link" bindtap="onExportCsv">导出 CSV</text>
+      </view>
+    </view>
+
+    <view class="import-box" wx:if="{{showImport}}">
+      <view class="muted import-hint">在 Excel 中选中数据区域复制后粘贴到下面。每行一条，列顺序为：日期、类型、金额、分类、备注；分隔符支持 Tab（Excel 复制）或逗号；首行是表头会自动跳过。</view>
+      <textarea class="import-input" value="{{importText}}" bindinput="onImportInput" placeholder="2026-09-24	支出	35.5	餐饮	午餐" maxlength="-1" auto-height></textarea>
+      <view class="import-actions">
+        <view class="btn ghost" bindtap="onToggleImport">取消</view>
+        <view class="btn primary" bindtap="onImportConfirm">确认导入</view>
+      </view>
+    </view>
+
+    <view class="field">
+      <text class="field-label">日期</text>
+      <picker class="field-picker" mode="date" value="{{form.date}}" bindchange="onDateChange">
+        <view>{{form.date}}</view>
+      </picker>
+    </view>
+
+    <view class="field">
+      <text class="field-label">类型</text>
+      <view class="segmented inline">
+        <view class="segment {{form.type === 'expense' ? 'active' : ''}}" data-type="expense" bindtap="onTypeChange">支出</view>
+        <view class="segment {{form.type === 'income' ? 'active' : ''}}" data-type="income" bindtap="onTypeChange">收入</view>
+      </view>
+    </view>
+
+    <view class="field">
+      <text class="field-label">金额（元）</text>
+      <input class="field-input" type="digit" placeholder="0.00" value="{{form.amount}}" bindinput="onAmountInput" />
+    </view>
+
+    <view class="field">
+      <text class="field-label">分类</text>
+      <input class="field-input" placeholder="如：餐饮" value="{{form.category}}" bindinput="onCategoryInput" maxlength="30" />
+    </view>
+
+    <view class="quick-tags">
+      <text
+        class="quick-tag {{item === form.category ? 'active' : ''}}"
+        wx:for="{{categoryOptions}}"
+        wx:key="*this"
+        data-name="{{item}}"
+        bindtap="onCategoryTap"
+      >{{item}}</text>
+    </view>
+
+    <view class="field">
+      <text class="field-label">备注</text>
+      <input class="field-input" placeholder="选填" value="{{form.note}}" bindinput="onNoteInput" maxlength="200" />
+    </view>
+
+    <view class="form-actions">
+      <view class="btn primary" bindtap="onSubmit">{{editingId ? '保存修改' : '保存记录'}}</view>
+      <view class="btn ghost" wx:if="{{editingId}}" bindtap="onCancelEdit">取消编辑</view>
+    </view>
+  </view>
+
+  <!-- 流水列表 -->
+  <view class="card-title">流水记录 <text class="muted">{{periodLabel}} · {{records.length}} 笔</text></view>
+
+  <view class="segmented">
+    <view class="segment {{filterType === 'all' ? 'active' : ''}}" data-value="all" bindtap="onFilterTypeChange">全部</view>
+    <view class="segment {{filterType === 'expense' ? 'active' : ''}}" data-value="expense" bindtap="onFilterTypeChange">仅支出</view>
+    <view class="segment {{filterType === 'income' ? 'active' : ''}}" data-value="income" bindtap="onFilterTypeChange">仅收入</view>
+  </view>
+
+  <input class="search-input" placeholder="搜索分类 / 备注" value="{{keyword}}" bindinput="onKeywordInput" />
+
+  <view class="card" wx:if="{{!records.length}}">
+    <view class="empty">暂无记录，先在上方记一笔吧</view>
+  </view>
+
+  <view class="rec-list" wx:else>
+    <view class="rec-card" wx:for="{{records}}" wx:key="id">
+      <view class="rec-line">
+        <text class="tag {{item.type}}">{{item.typeLabel}}</text>
+        <text class="rec-cat">{{item.category}}</text>
+        <text class="rec-amount {{item.amountCls}}">{{item.amount}}</text>
+      </view>
+      <view class="rec-meta">
+        <text class="muted">{{item.date}}</text>
+        <text class="muted rec-note" wx:if="{{item.note}}">· {{item.note}}</text>
+      </view>
+      <view class="rec-actions">
+        <text class="mini-btn" data-id="{{item.id}}" bindtap="onEdit">修改</text>
+        <text class="mini-btn danger" data-id="{{item.id}}" bindtap="onDelete">删除</text>
+      </view>
+    </view>
+  </view>
+</view>

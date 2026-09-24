@@ -1,0 +1,29 @@
+.table-scroll {
+  width: 100%;
+}
+
+.table.fixed {
+  width: 1020rpx;
+}
+
+.table.fixed .td {
+  flex: none;
+  text-align: right;
+}
+
+.table.fixed .td.col-month {
+  width: 160rpx;
+  text-align: left;
+}
+
+.table.fixed .td.col-num {
+  width: 184rpx;
+}
+
+.table.fixed .td.col-count {
+  width: 120rpx;
+}
+
+.tip {
+  padding: 16rpx 4rpx 0;
+}

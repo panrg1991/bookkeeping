@@ -1,0 +1,6 @@
+{
+  "usingComponents": {},
+  "navigationBarTitleText": "月度总览",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "light"
+}

@@ -1,0 +1,71 @@
+<view class="page">
+  <view class="toolbar">
+    <picker mode="selector" range="{{years}}" value="{{yearIndex}}" bindchange="onYearChange">
+      <view class="picker">{{year}} 年</view>
+    </picker>
+    <picker mode="selector" range="{{monthOptions}}" value="{{monthIndex}}" bindchange="onMonthChange">
+      <view class="picker">{{monthOptions[monthIndex]}}</view>
+    </picker>
+  </view>
+
+  <view class="cards">
+    <view class="metric" wx:for="{{cards}}" wx:key="label">
+      <view class="metric-inner">
+        <view class="metric-label">{{item.label}}</view>
+        <view class="metric-value {{item.cls}}">{{item.value}}</view>
+        <view class="metric-sub">{{item.sub}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">月度收支趋势（元）</view>
+    <view class="legend">
+      <view class="legend-item"><text class="dot income"></text>收入</view>
+      <view class="legend-item"><text class="dot expense"></text>支出</view>
+    </view>
+    <view class="chart-bars">
+      <view class="chart-group" wx:for="{{bars}}" wx:key="month">
+        <view class="chart-cols">
+          <view class="chart-bar income" style="height:{{item.incomeH}}rpx"></view>
+          <view class="chart-bar expense" style="height:{{item.expenseH}}rpx"></view>
+        </view>
+        <text class="chart-label">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card-title">{{year}} 年各月明细</view>
+  <scroll-view scroll-x class="table-scroll">
+    <view class="table fixed">
+      <view class="tr head">
+        <text class="td col-month">月份</text>
+        <text class="td col-num">收入</text>
+        <text class="td col-num">支出</text>
+        <text class="td col-num">利润</text>
+        <text class="td col-num">累计利润</text>
+        <text class="td col-count">笔数</text>
+      </view>
+
+      <view class="tr {{item.active ? 'active' : ''}}" wx:for="{{rows}}" wx:key="month">
+        <text class="td col-month">{{item.label}}</text>
+        <text class="td col-num income-text">{{item.income}}</text>
+        <text class="td col-num expense-text">{{item.expense}}</text>
+        <text class="td col-num {{item.profitCls}}">{{item.profit}}</text>
+        <text class="td col-num {{item.cumulativeCls}}">{{item.cumulative}}</text>
+        <text class="td col-count">{{item.count}}</text>
+      </view>
+
+      <view class="tr total">
+        <text class="td col-month">合计</text>
+        <text class="td col-num income-text">{{total.income}}</text>
+        <text class="td col-num expense-text">{{total.expense}}</text>
+        <text class="td col-num {{total.profitCls}}">{{total.profit}}</text>
+        <text class="td col-num">-</text>
+        <text class="td col-count">{{total.count}}</text>
+      </view>
+    </view>
+  </scroll-view>
+  <view class="muted tip" wx:if="{{!hasData}}">当前年份还没有记录，去「流水记录」记一笔吧（表格可左右滑动）</view>
+  <view class="muted tip" wx:else>表格可左右滑动查看完整列</view>
+</view>

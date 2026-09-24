@@ -1,0 +1,406 @@
+page {
+  background: #f4f6fb;
+  color: #1f2937;
+  font-size: 28rpx;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.page {
+  padding: 20rpx 24rpx 60rpx;
+}
+
+/* ---------------- 卡片 ---------------- */
+.card {
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(16, 24, 40, 0.06);
+}
+
+.card-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 24rpx;
+}
+
+/* ---------------- 指标卡 ---------------- */
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 4rpx;
+}
+
+.metric {
+  width: 50%;
+  box-sizing: border-box;
+  padding: 8rpx;
+}
+
+.metric-inner {
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(16, 24, 40, 0.06);
+}
+
+.metric-label {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.metric-value {
+  font-size: 38rpx;
+  font-weight: 700;
+  margin-top: 8rpx;
+}
+
+.metric-sub {
+  font-size: 22rpx;
+  color: #9ca3af;
+  margin-top: 4rpx;
+}
+
+/* ---------------- 工具条 ---------------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20rpx;
+}
+
+.picker {
+  background: #ffffff;
+  border: 2rpx solid #e3e8f0;
+  border-radius: 10rpx;
+  padding: 12rpx 24rpx;
+  font-size: 26rpx;
+  margin-right: 16rpx;
+  margin-bottom: 12rpx;
+}
+
+.picker::after {
+  content: "▾";
+  margin-left: 10rpx;
+  color: #9ca3af;
+}
+
+/* ---------------- 按钮 ---------------- */
+.btn {
+  display: inline-block;
+  font-size: 26rpx;
+  line-height: 1.4;
+  padding: 14rpx 30rpx;
+  border-radius: 10rpx;
+  text-align: center;
+  margin-right: 16rpx;
+  margin-bottom: 12rpx;
+}
+
+.btn.primary {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.btn.ghost {
+  background: #ffffff;
+  border: 2rpx solid #e3e8f0;
+  color: #1f2937;
+}
+
+.btn.danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.btn.block {
+  display: block;
+  margin-right: 0;
+}
+
+.btn.disabled {
+  opacity: 0.5;
+}
+
+/* ---------------- 表格 ---------------- */
+.table {
+  background: #ffffff;
+  border-radius: 16rpx;
+  overflow: hidden;
+  box-shadow: 0 2rpx 12rpx rgba(16, 24, 40, 0.06);
+}
+
+.tr {
+  display: flex;
+  align-items: center;
+  padding: 18rpx 20rpx;
+  border-bottom: 2rpx solid #f1f5f9;
+  font-size: 26rpx;
+}
+
+.tr.head {
+  background: #f8fafc;
+  color: #6b7280;
+  font-size: 24rpx;
+}
+
+.tr.total {
+  background: #f1f5f9;
+  font-weight: 700;
+}
+
+.tr.active {
+  background: #eff6ff;
+}
+
+.td {
+  flex: 1;
+  text-align: right;
+}
+
+.td:first-child {
+  text-align: left;
+}
+
+.td.wide {
+  flex: 1.4;
+}
+
+/* ---------------- 颜色 ---------------- */
+.income-text {
+  color: #16a34a;
+}
+
+.expense-text {
+  color: #dc2626;
+}
+
+.profit-text {
+  color: #2563eb;
+}
+
+.negative {
+  color: #dc2626;
+}
+
+.zero {
+  color: #9ca3af;
+}
+
+/* ---------------- 标签 ---------------- */
+.tag {
+  display: inline-block;
+  font-size: 22rpx;
+  padding: 2rpx 14rpx;
+  border-radius: 20rpx;
+}
+
+.tag.expense {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.tag.income {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+/* ---------------- 分段选择 ---------------- */
+.segmented {
+  display: flex;
+  border: 2rpx solid #e3e8f0;
+  border-radius: 10rpx;
+  overflow: hidden;
+  margin-bottom: 20rpx;
+  background: #ffffff;
+}
+
+.segment {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  font-size: 26rpx;
+  color: #6b7280;
+}
+
+.segment.active {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+/* ---------------- 空状态 ---------------- */
+.empty {
+  padding: 60rpx 0;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 26rpx;
+}
+
+/* ---------------- 图表 ---------------- */
+.chart {
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 24rpx 12rpx 12rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(16, 24, 40, 0.06);
+}
+
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  height: 240rpx;
+}
+
+.chart-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.chart-cols {
+  display: flex;
+  align-items: flex-end;
+  height: 190rpx;
+}
+
+.chart-bar {
+  width: 12rpx;
+  border-radius: 4rpx 4rpx 0 0;
+  margin: 0 3rpx;
+}
+
+.chart-bar.income {
+  background: #16a34a;
+}
+
+.chart-bar.expense {
+  background: #dc2626;
+}
+
+.chart-label {
+  font-size: 20rpx;
+  color: #9ca3af;
+  margin-top: 10rpx;
+}
+
+.legend {
+  display: flex;
+  font-size: 22rpx;
+  color: #6b7280;
+  margin-bottom: 12rpx;
+}
+
+.legend-item {
+  margin-right: 28rpx;
+}
+
+.dot {
+  display: inline-block;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 4rpx;
+  margin-right: 8rpx;
+}
+
+.dot.income {
+  background: #16a34a;
+}
+
+.dot.expense {
+  background: #dc2626;
+}
+
+/* ---------------- 表单 ---------------- */
+.field {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 2rpx solid #f1f5f9;
+}
+
+.field-label {
+  width: 150rpx;
+  color: #6b7280;
+  font-size: 26rpx;
+}
+
+.field-input {
+  flex: 1;
+  font-size: 28rpx;
+}
+
+.field-picker {
+  flex: 1;
+  font-size: 28rpx;
+}
+
+.placeholder {
+  color: #9ca3af;
+}
+
+.quick-tags {
+  display: flex;
+  flex-wrap: wrap;
+  padding-top: 16rpx;
+}
+
+.quick-tag {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 24rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 24rpx;
+  margin: 0 12rpx 12rpx 0;
+}
+
+.quick-tag.active {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* ---------------- 分类占比条 ---------------- */
+.cat-row {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 0;
+}
+
+.cat-name {
+  width: 150rpx;
+  font-size: 26rpx;
+}
+
+.cat-bar-wrap {
+  flex: 1;
+  height: 22rpx;
+  background: #f1f5f9;
+  border-radius: 12rpx;
+  overflow: hidden;
+  margin: 0 16rpx;
+}
+
+.cat-bar {
+  height: 100%;
+  border-radius: 12rpx;
+}
+
+.cat-amount {
+  width: 170rpx;
+  text-align: right;
+  font-size: 26rpx;
+}
+
+.cat-ratio {
+  width: 100rpx;
+  text-align: right;
+  font-size: 24rpx;
+  color: #6b7280;
+}

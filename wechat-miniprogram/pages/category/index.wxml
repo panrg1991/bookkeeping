@@ -1,0 +1,37 @@
+<view class="page">
+  <view class="toolbar">
+    <picker mode="selector" range="{{years}}" value="{{yearIndex}}" bindchange="onYearChange">
+      <view class="picker">{{year}} 年</view>
+    </picker>
+    <picker mode="selector" range="{{monthOptions}}" value="{{monthIndex}}" bindchange="onMonthChange">
+      <view class="picker">{{monthOptions[monthIndex]}}</view>
+    </picker>
+  </view>
+
+  <view class="segmented">
+    <view class="segment {{type === 'expense' ? 'active' : ''}}" data-type="expense" bindtap="onTypeChange">支出结构</view>
+    <view class="segment {{type === 'income' ? 'active' : ''}}" data-type="income" bindtap="onTypeChange">收入结构</view>
+  </view>
+
+  <view class="card">
+    <view class="cat-total-row">
+      <text class="muted">{{periodLabel}} · {{type === 'expense' ? '支出' : '收入'}}合计</text>
+      <text class="cat-total {{type === 'expense' ? 'expense-text' : 'income-text'}}">{{total.amount}}</text>
+    </view>
+    <view class="muted cat-sub">共 {{total.kinds}} 个分类 · {{total.count}} 笔</view>
+
+    <view class="cat-row" wx:for="{{rows}}" wx:key="category">
+      <text class="cat-name">{{item.category}}</text>
+      <view class="cat-bar-wrap">
+        <view
+          class="cat-bar"
+          style="width:{{item.percent}}%;background:{{type === 'expense' ? '#dc2626' : '#16a34a'}}"
+        ></view>
+      </view>
+      <text class="cat-amount {{type === 'expense' ? 'expense-text' : 'income-text'}}">{{item.amount}}</text>
+      <text class="cat-ratio">{{item.ratioText}}%</text>
+    </view>
+
+    <view class="empty" wx:if="{{!hasData}}">{{periodLabel}}暂无{{type === 'expense' ? '支出' : '收入'}}数据</view>
+  </view>
+</view>

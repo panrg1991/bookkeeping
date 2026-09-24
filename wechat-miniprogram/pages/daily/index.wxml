@@ -1,0 +1,89 @@
+<view class="page">
+  <view class="toolbar">
+    <picker mode="selector" range="{{years}}" value="{{yearIndex}}" bindchange="onYearChange">
+      <view class="picker">{{year}} 年</view>
+    </picker>
+    <picker mode="selector" range="{{monthOptions}}" value="{{monthIndex}}" bindchange="onMonthChange">
+      <view class="picker">{{monthOptions[monthIndex]}}</view>
+    </picker>
+  </view>
+
+  <view class="cards">
+    <view class="metric">
+      <view class="metric-inner">
+        <view class="metric-label">支出合计</view>
+        <view class="metric-value expense-text">{{summary.expense}}</view>
+      </view>
+    </view>
+    <view class="metric">
+      <view class="metric-inner">
+        <view class="metric-label">收入合计</view>
+        <view class="metric-value income-text">{{summary.income}}</view>
+      </view>
+    </view>
+    <view class="metric">
+      <view class="metric-inner">
+        <view class="metric-label">净额</view>
+        <view class="metric-value {{summary.profitCls}}">{{summary.profit}}</view>
+      </view>
+    </view>
+    <view class="metric">
+      <view class="metric-inner">
+        <view class="metric-label">记账天数 / 笔数</view>
+        <view class="metric-value">{{summary.days}} / {{summary.count}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card-title">{{periodLabel}} 每日明细</view>
+  <view class="muted tip">点击任意一天，可展开当天全部流水并直接修改或删除</view>
+
+  <view class="card" wx:if="{{!hasData}}">
+    <view class="empty">{{periodLabel}}暂无记录</view>
+  </view>
+
+  <view class="day-list" wx:else>
+    <view class="day-card" wx:for="{{days}}" wx:key="date">
+      <view class="day-head" data-date="{{item.date}}" bindtap="onToggleDay">
+        <view class="day-left">
+          <text class="day-date">{{item.dayLabel}}</text>
+          <text class="day-week">{{item.weekday}}</text>
+          <text class="day-count">{{item.count}} 笔</text>
+        </view>
+        <text class="day-arrow">{{item.expanded ? '收起 ▲' : '展开 ▼'}}</text>
+      </view>
+
+      <view class="day-body">
+        <view class="day-cell">
+          <text class="day-key">支出</text>
+          <text class="day-value expense-text">{{item.expense}}</text>
+        </view>
+        <view class="day-cell">
+          <text class="day-key">收入</text>
+          <text class="day-value income-text">{{item.income}}</text>
+        </view>
+        <view class="day-cell">
+          <text class="day-key">净额</text>
+          <text class="day-value {{item.profitCls}}">{{item.profit}}</text>
+        </view>
+      </view>
+
+      <view class="detail" wx:if="{{item.expanded}}">
+        <view class="detail-row" wx:for="{{item.records}}" wx:for-item="rec" wx:key="id">
+          <view class="detail-main">
+            <view class="detail-line">
+              <text class="tag {{rec.type}}">{{rec.typeLabel}}</text>
+              <text class="detail-cat">{{rec.category}}</text>
+              <text class="detail-amount {{rec.amountCls}}">{{rec.amount}}</text>
+            </view>
+            <view class="detail-note muted" wx:if="{{rec.note}}">{{rec.note}}</view>
+          </view>
+          <view class="detail-actions">
+            <text class="mini-btn" data-id="{{rec.id}}" bindtap="onEdit">改</text>
+            <text class="mini-btn danger" data-id="{{rec.id}}" bindtap="onDelete">删</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

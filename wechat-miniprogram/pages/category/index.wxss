@@ -1,0 +1,14 @@
+.cat-total-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.cat-total {
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.cat-sub {
+  margin-bottom: 12rpx;
+}
