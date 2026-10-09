@@ -91,6 +91,8 @@ Page({
     records: [],
     showImport: false,
     importText: '',
+    showBackup: false,
+    restoreText: '',
   },
 
   rawRecords: [],
@@ -422,6 +424,80 @@ Page({
 
   onOpenLogs() {
     wx.navigateTo({ url: '/pages/logs/index' });
+  },
+
+  /* ------------------------------ 备份 / 恢复 ----------------------------- */
+
+  onToggleBackup() {
+    this.setData({ showBackup: !this.data.showBackup });
+  },
+
+  /** 备份：把全部记录（含分类字典）复制到剪贴板，便于发送到新手机 */
+  async onBackup() {
+    wx.showLoading({ title: '生成备份', mask: true });
+    try {
+      const backup = await store.exportAll();
+      wx.hideLoading();
+      const text = JSON.stringify(backup);
+      wx.setClipboardData({
+        data: text,
+        success: () => {
+          wx.showModal({
+            title: '备份已复制',
+            content: `共 ${backup.count} 条记录已复制到剪贴板（约 ${(text.length / 1024).toFixed(1)} KB）。\n\n请粘贴并发送给「文件传输助手」或自己的聊天窗口；换手机后用本页的「备份/恢复 → 合并/覆盖恢复」把内容粘贴回来。`,
+            showCancel: false,
+          });
+        },
+      });
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: err.message, icon: 'none' });
+    }
+  },
+
+  onRestoreInput(e) {
+    this.setData({ restoreText: e.detail.value });
+  },
+
+  /** 恢复备份：mode = merge（合并） / replace（覆盖） */
+  onRestore(e) {
+    const mode = e.currentTarget.dataset.mode === 'merge' ? 'merge' : 'replace';
+
+    let payload;
+    try {
+      payload = JSON.parse(this.data.restoreText);
+    } catch (err) {
+      wx.showToast({ title: '备份内容不是合法 JSON', icon: 'none' });
+      return;
+    }
+    if (!payload || !Array.isArray(payload.records)) {
+      wx.showToast({ title: '备份内容缺少 records 字段', icon: 'none' });
+      return;
+    }
+
+    wx.showModal({
+      title: mode === 'replace' ? '覆盖恢复' : '合并恢复',
+      content:
+        mode === 'replace'
+          ? `将清空当前全部记录，再写入备份中的 ${payload.records.length} 条。此操作不可撤销，确定继续？`
+          : `将备份中的 ${payload.records.length} 条合并进来（按 id 去重，保留现有记录）。确定继续？`,
+      confirmText: '确定恢复',
+      confirmColor: '#dc2626',
+      success: async (res) => {
+        if (!res.confirm) return;
+        wx.showLoading({ title: '恢复中', mask: true });
+        try {
+          const result = await store.importAll(payload, { mode });
+          wx.hideLoading();
+          wx.showToast({ title: `已恢复 ${result.inserted} 条`, icon: 'success' });
+          this.setData({ showBackup: false, restoreText: '' });
+          this.refresh();
+        } catch (err) {
+          wx.hideLoading();
+          wx.showToast({ title: err.message, icon: 'none' });
+        }
+      },
+    });
   },
 
   /* ------------------------------- 数据加载 ---------------------------- */

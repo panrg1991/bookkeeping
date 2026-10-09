@@ -37,6 +37,8 @@ const ASYNC_METHODS = [
   'listLogs',
   'logStats',
   'clearLogs',
+  'exportAll',
+  'importAll',
 ];
 
 /** 工具函数（不涉及存储，保持同步） */

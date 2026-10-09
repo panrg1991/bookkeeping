@@ -13,7 +13,7 @@
 - **分类统计**：按支出或收入维度查看各分类金额与占比
 - **CSV 导出**：月度总览、每日明细、流水记录均可导出为 CSV（Excel 可直接打开）
 
-> **微信小程序版**：功能一致的实现位于 [`wechat-miniprogram/`](wechat-miniprogram/README.md)。小程序端支持两种数据模式，**当前为本地存储模式**（数据存手机本地、无需云开发、导入项目即可运行），同时完整保留**微信云开发数据库模式**（数据按 openid 隔离、多端同步、云端操作日志）—— 改 `utils/config.js` 的 `mode` 一个字段即可切换，页面代码无需改动；两种模式都会为每笔数据操作留存操作日志。配置与模式切换见 [docs/deploy-checklist.md](wechat-miniprogram/docs/deploy-checklist.md)，存储与接口见 [docs/data-and-api.md](wechat-miniprogram/docs/data-and-api.md)，云模式部署见 [docs/cloud-database.md](wechat-miniprogram/docs/cloud-database.md)，发布流程见 [docs/release.md](wechat-miniprogram/docs/release.md)。
+> **微信小程序版**：功能一致的实现位于 [`wechat-miniprogram/`](wechat-miniprogram/README.md)。小程序端支持两种数据模式，**当前为本地存储模式**（数据存手机本地、无需云开发、导入项目即可运行），同时完整保留**微信云开发数据库模式**（数据按 openid 隔离、多端同步、云端操作日志）—— 改 `utils/config.js` 的 `mode` 一个字段即可切换，页面代码无需改动；两种模式都会为每笔数据操作留存操作日志。配置与模式切换见 [docs/deploy-checklist.md](wechat-miniprogram/docs/deploy-checklist.md)，存储与接口见 [docs/data-and-api.md](wechat-miniprogram/docs/data-and-api.md)，换手机迁移见 [docs/data-migration.md](wechat-miniprogram/docs/data-migration.md)，云模式部署见 [docs/cloud-database.md](wechat-miniprogram/docs/cloud-database.md)，发布流程见 [docs/release.md](wechat-miniprogram/docs/release.md)。
 
 ## 运行
 

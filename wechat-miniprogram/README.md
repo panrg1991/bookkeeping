@@ -40,6 +40,7 @@
 | 分类统计 | 支出 / 收入两个维度，各分类金额、占比与条形图 |
 | **操作日志** | 新增 / 修改 / 删除 / 导入全部留痕：操作时间、变更前后数据、变更字段、失败原因、客户端版本与机型；支持按类型筛选、分页、清理旧日志 |
 | 数据导出 | 「导出 CSV」把当前筛选结果写入剪贴板，粘贴到 Excel 即可 |
+| **备份 / 恢复** | 一键把全部记录（含分类字典）复制为 JSON 文本；换手机时粘贴即可「覆盖恢复」或「合并恢复」 |
 
 ## 目录结构
 
@@ -57,6 +58,7 @@ pages/category/                  分类统计
 pages/logs/                      操作日志（排查用）
 cloudfunctions/bookkeeping/      统一业务云函数（云模式使用，本地模式不加载）
 docs/deploy-checklist.md         部署配置清单（改哪些配置、模式切换、报错对照）
+docs/data-migration.md           数据存放位置与换手机迁移（备份/恢复、云模式同步）
 docs/data-and-api.md             数据存储与接口调用说明
 docs/cloud-database.md           云数据库设计与部署（集合、权限、索引、日志）
 docs/release.md                  发布上线指引（AppID、审核、发布步骤）
@@ -86,6 +88,9 @@ project.config.json              微信开发者工具工程配置
 | `bk:seq` | 记录自增 ID |
 | `bk:logs` | 操作日志（滚动保留最近 500 条，`MAX_LOGS` 可调） |
 
+> 这些数据存在**微信客户端内部的 Storage**（不是可以拷贝的文件，开发者工具 → 调试器 → Storage 面板可查看）。
+> 换手机迁移见 **[docs/data-migration.md](docs/data-migration.md)**：推荐切云模式自动同步，或用「备份/恢复」把 JSON 文本搬过去。
+
 ### 数据层方法（两种模式同名同返回结构）
 
 | 方法 | 说明 |
@@ -98,6 +103,7 @@ project.config.json              微信开发者工具工程配置
 | `overview` / `monthlySummary` / `dailySummary` / `categorySummary` / `years` | 各类统计（云端由聚合完成） |
 | `listCategories` / `addCategory` | 分类字典 |
 | `listLogs` / `logStats` / `clearLogs` | 操作日志查询、汇总与清理 |
+| `exportAll` / `importAll` | 全量备份（记录 + 分类字典）与恢复（`replace` 覆盖 / `merge` 合并） |
 | `toCsv` / `toDateString` / `toType` / `toAmountCents` | 纯本地工具（同步） |
 
 详细的调用关系、字段结构与云端对照见 **[docs/data-and-api.md](docs/data-and-api.md)**。

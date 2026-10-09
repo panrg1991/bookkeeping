@@ -71,6 +71,11 @@
   font-size: 26rpx;
 }
 
+.backup-row {
+  display: flex;
+  padding-bottom: 16rpx;
+}
+
 .import-actions {
   display: flex;
   justify-content: flex-end;

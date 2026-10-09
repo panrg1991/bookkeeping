@@ -96,6 +96,8 @@
 | `listLogs(options)` | `listLogs` | 操作日志分页查询 |
 | `logStats()` | `logStats` | 日志按操作类型汇总 |
 | `clearLogs(days)` | `clearLogs` | 清理 N 天前的日志 |
+| `exportAll()` | —（云端用 `listRecords` + `getCategories` 组合） | 全量备份：记录 + 分类字典，用于换手机迁移或留档 |
+| `importAll(payload, { mode })` | `importRecords`（云端） | 从备份恢复：`replace` 覆盖 / `merge` 合并（按 id 去重） |
 | `toCsv` / `toDateString` / `toType` / `toAmountCents` | — | 纯本地工具函数（`utils/format.js`），不涉及存储 |
 
 云函数统一返回 `{ ok: true, data }` 或 `{ ok: false, message }`，`store.js` 负责拆包与错误提示。

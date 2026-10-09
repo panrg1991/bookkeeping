@@ -155,6 +155,32 @@ module.exports = {
     return call('clearLogs', { days });
   },
 
+  /* ------------------------------ 备份恢复 ------------------------------ */
+
+  /** 导出全部数据（云模式下数据本身已在云端同步，这里主要供留档或跨环境搬运） */
+  async exportAll() {
+    const [list, categories] = await Promise.all([
+      call('listRecords', { limit: config.maxListSize || 2000 }),
+      call('getCategories'),
+    ]);
+    return {
+      app: 'bookkeeping-miniprogram',
+      version: 1,
+      mode: 'cloud',
+      exportedAt: new Date().toISOString(),
+      count: list.items.length,
+      records: list.items,
+      categories,
+    };
+  },
+
+  /** 从备份恢复（云模式：经云函数批量导入，会自动写入操作日志） */
+  importAll(payload) {
+    const records = payload && Array.isArray(payload.records) ? payload.records : [];
+    if (!records.length) return Promise.reject(new Error('备份内容里没有记录'));
+    return call('importRecords', { items: records });
+  },
+
   /* --------------------- 纯本地工具函数（不涉及存储） --------------------- */
 
   toCsv: fmt.toCsv,

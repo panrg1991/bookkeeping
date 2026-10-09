@@ -14,6 +14,7 @@
       <text class="card-title">{{editingId ? '修改记录 #' + editingId : '记一笔'}}</text>
       <view class="form-head-actions">
         <text class="link" bindtap="onToggleImport">{{showImport ? '收起导入' : '批量导入'}}</text>
+        <text class="link" bindtap="onToggleBackup">{{showBackup ? '收起备份' : '备份/恢复'}}</text>
         <text class="link" bindtap="onExportCsv">导出 CSV</text>
       </view>
     </view>
@@ -24,6 +25,26 @@
       <view class="import-actions">
         <view class="btn ghost" bindtap="onToggleImport">取消</view>
         <view class="btn primary" bindtap="onImportConfirm">确认导入</view>
+      </view>
+    </view>
+
+    <view class="import-box" wx:if="{{showBackup}}">
+      <view class="muted import-hint">换手机迁移：先点「备份数据」把全部记录（含分类字典）复制到剪贴板，粘贴发送给「文件传输助手」或自己；在新手机打开本页，把内容粘贴到下面，选择「合并恢复」或「覆盖恢复」。备份内容为 JSON 文本，请勿删改。</view>
+      <view class="backup-row">
+        <view class="btn primary" bindtap="onBackup">备份数据（复制到剪贴板）</view>
+      </view>
+      <textarea
+        class="import-input"
+        value="{{restoreText}}"
+        bindinput="onRestoreInput"
+        placeholder='粘贴备份内容，形如 {"app":"bookkeeping-miniprogram","records":[...]}'
+        maxlength="-1"
+        auto-height
+      ></textarea>
+      <view class="import-actions">
+        <view class="btn ghost" bindtap="onToggleBackup">取消</view>
+        <view class="btn ghost" data-mode="merge" bindtap="onRestore">合并恢复</view>
+        <view class="btn primary" data-mode="replace" bindtap="onRestore">覆盖恢复</view>
       </view>
     </view>
 

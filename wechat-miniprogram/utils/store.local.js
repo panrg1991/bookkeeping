@@ -513,6 +513,109 @@ function clearLogs(days) {
   return { removed, days: keepDays };
 }
 
+/* --------------------------------- 备份恢复 -------------------------------- */
+
+const BACKUP_VERSION = 1;
+
+/**
+ * 导出全部数据（记录 + 分类字典），用于换手机迁移或留档。
+ * 返回可 JSON.stringify 的对象，页面侧复制到剪贴板即可搬运。
+ */
+function exportAll() {
+  return {
+    app: 'bookkeeping-miniprogram',
+    version: BACKUP_VERSION,
+    mode: 'local',
+    exportedAt: new Date().toISOString(),
+    count: readRecords().length,
+    records: readRecords().map((item) => Object.assign({}, item)),
+    categories: listCategories(),
+  };
+}
+
+/**
+ * 从备份恢复数据
+ * @param {object} payload exportAll() 产出的对象（或同构 JSON）
+ * @param {object} options { mode: 'replace' | 'merge' }
+ *   - replace：清空现有记录后写入（ID 与时间戳沿用备份里的）
+ *   - merge  ：保留现有记录，仅追加备份中不存在的记录（按 id 去重）
+ */
+function importAll(payload, options) {
+  if (!payload || typeof payload !== 'object') throw new Error('备份内容格式不正确（应为 JSON 对象）');
+  if (!Array.isArray(payload.records)) throw new Error('备份内容缺少 records 字段');
+
+  const mode = (options && options.mode) === 'merge' ? 'merge' : 'replace';
+  const next = mode === 'replace' ? [] : readRecords().slice();
+  const existingIds = {};
+  next.forEach((item) => {
+    existingIds[String(item.id)] = true;
+  });
+
+  let seq = Number(wx.getStorageSync(SEQ_KEY)) || 0;
+  seq = Math.max(seq, next.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0));
+
+  let inserted = 0;
+  let skipped = 0;
+
+  payload.records.forEach((raw) => {
+    try {
+      const data = normalizeInput(raw);
+      const rawId = Number(raw && raw.id);
+      const hasId = Number.isInteger(rawId) && rawId > 0;
+
+      if (hasId && existingIds[String(rawId)]) {
+        skipped += 1;
+        return;
+      }
+
+      if (hasId) {
+        seq = Math.max(seq, rawId);
+      } else {
+        seq += 1;
+      }
+      const id = hasId ? rawId : seq;
+
+      next.push(
+        Object.assign({ id }, data, {
+          createdAt: Number(raw && raw.createdAt) || Date.now(),
+          updatedAt: Number(raw && raw.updatedAt) || Date.now(),
+        })
+      );
+      existingIds[String(id)] = true;
+      inserted += 1;
+    } catch (err) {
+      skipped += 1;
+    }
+  });
+
+  writeRecords(next);
+  wx.setStorageSync(SEQ_KEY, seq);
+
+  // 分类字典：并集合并，不覆盖用户已有分类
+  const incoming = payload.categories;
+  if (incoming && typeof incoming === 'object') {
+    const categories = listCategories();
+    ['income', 'expense'].forEach((kind) => {
+      const list = Array.isArray(incoming[kind]) ? incoming[kind] : [];
+      list.forEach((name) => {
+        const clean = String(name || '').trim();
+        if (clean && categories[kind].indexOf(clean) < 0) categories[kind].push(clean);
+      });
+    });
+    wx.setStorageSync(CATEGORIES_KEY, categories);
+  }
+
+  appendLogs([
+    buildLog({
+      action: 'restore',
+      count: inserted,
+      summary: `恢复备份（${mode === 'replace' ? '覆盖' : '合并'}）：写入 ${inserted} 条，跳过 ${skipped} 条`,
+    }),
+  ]);
+
+  return { mode, inserted, skipped, total: next.length };
+}
+
 module.exports = {
   init,
   initDb,
@@ -533,6 +636,8 @@ module.exports = {
   listLogs,
   logStats,
   clearLogs,
+  exportAll,
+  importAll,
   toCsv: fmt.toCsv,
   toDateString: fmt.toDateString,
   toType: fmt.toType,
