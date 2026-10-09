@@ -1,3 +1,18 @@
+.account-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10rpx;
+}
+
+.account-copy {
+  font-size: 22rpx;
+  color: #2563eb;
+  border: 2rpx solid #dbeafe;
+  border-radius: 8rpx;
+  padding: 4rpx 16rpx;
+}
+
 .stat-line {
   display: flex;
   flex-wrap: wrap;

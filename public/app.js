@@ -58,6 +58,8 @@ const state = {
   month: String(new Date().getMonth() + 1),
   tab: 'month',
   editingId: null,
+  // 计价方式：'amount' 直接填金额 / 'unit' 单价 × 数量 自动计算
+  calcMode: 'amount',
   categoryType: 'expense',
   recordFilter: { type: 'all', keyword: '' },
   expandedDay: null,
@@ -213,7 +215,7 @@ function renderDaily() {
              <tbody>${records.map((r) => `<tr>
                  <td><span class="tag ${r.type}">${r.type === 'income' ? '收入' : '支出'}</span></td>
                  <td>${escapeHtml(r.category)}</td>
-                 <td class="num ${r.type === 'income' ? 'income-text' : 'expense-text'}">${fmt(Math.round(r.amount * 100))}</td>
+                 <td class="num ${r.type === 'income' ? 'income-text' : 'expense-text'}">${fmt(Math.round(r.amount * 100))}${unitPriceText(r) ? `<span class="unit-price">${unitPriceText(r)}</span>` : ''}</td>
                  <td>${escapeHtml(r.note) || '<span class="muted">-</span>'}</td>
                  <td><button class="row-btn" type="button" data-action="edit" data-id="${r.id}">修改</button>
                      <button class="row-btn danger" type="button" data-action="delete" data-id="${r.id}">删除</button></td>
@@ -264,7 +266,7 @@ function renderRecords() {
         <td>${r.date}</td>
         <td><span class="tag ${r.type}">${r.type === 'income' ? '收入' : '支出'}</span></td>
         <td>${escapeHtml(r.category)}</td>
-        <td class="num ${r.type === 'income' ? 'income-text' : 'expense-text'}">${r.type === 'income' ? '+' : '-'}${fmt(Math.round(r.amount * 100))}</td>
+        <td class="num ${r.type === 'income' ? 'income-text' : 'expense-text'}">${r.type === 'income' ? '+' : '-'}${fmt(Math.round(r.amount * 100))}${unitPriceText(r) ? `<span class="unit-price">${unitPriceText(r)}</span>` : ''}</td>
         <td class="cell-note">${escapeHtml(r.note) || '<span class="muted">-</span>'}</td>
         <td><button class="row-btn" type="button" data-action="edit" data-id="${r.id}">修改</button>
             <button class="row-btn danger" type="button" data-action="delete" data-id="${r.id}">删除</button></td>
@@ -354,13 +356,58 @@ function syncCategoryOptions() {
 
 /* ================================ 交互 ================================ */
 
+/** 数量展示：整数不带小数，小数最多 3 位 */
+function formatQuantity(value) {
+  const num = Number(value) || 0;
+  return Number.isInteger(num) ? String(num) : String(Number(num.toFixed(3)));
+}
+
+/** 「单价 × 数量」的展示文本，如 ¥3.50 × 2.5；未使用该计价方式时返回空串 */
+function unitPriceText(record) {
+  const unitPrice = Number(record.unitPrice) || 0;
+  const quantity = Number(record.quantity) || 0;
+  if (unitPrice <= 0 || quantity <= 0) return '';
+  return `¥${unitPrice.toFixed(2)} × ${formatQuantity(quantity)}`;
+}
+
+/** 切换计价方式：金额 / 单价 × 数量 */
+function setCalcMode(mode) {
+  state.calcMode = mode === 'unit' ? 'unit' : 'amount';
+  $$('#calcModeSwitch .seg').forEach((btn) => btn.classList.toggle('is-active', btn.dataset.calc === state.calcMode));
+  $('#amountField').hidden = state.calcMode !== 'amount';
+  $('#unitPriceField').hidden = state.calcMode !== 'unit';
+  $('#quantityField').hidden = state.calcMode !== 'unit';
+  $('#computedField').hidden = state.calcMode !== 'unit';
+  if (state.calcMode === 'unit') updateComputed();
+}
+
+/** 单价 × 数量 实时计算，保留两位小数（与后端 Math.round(单价分 × 数量) 一致） */
+function updateComputed() {
+  const unitPrice = Number($('#fUnitPrice').value);
+  const quantity = Number($('#fQuantity').value);
+  const valid = Number.isFinite(unitPrice) && unitPrice > 0 && Number.isFinite(quantity) && quantity > 0;
+  $('#fComputed').value = valid ? (Math.round(unitPrice * 100 * quantity) / 100).toFixed(2) : '';
+}
+
 function startEdit(record) {
   state.editingId = record.id;
   $('#fDate').value = record.date;
   $('#fType').value = record.type;
-  $('#fAmount').value = record.amount;
   $('#fCategory').value = record.category;
   $('#fNote').value = record.note;
+
+  // 有单价与数量时按「单价 × 数量」模式回填，否则按金额模式
+  if (Number(record.unitPrice) > 0 && Number(record.quantity) > 0) {
+    $('#fUnitPrice').value = record.unitPrice;
+    $('#fQuantity').value = record.quantity;
+    $('#fAmount').value = '';
+    setCalcMode('unit');
+  } else {
+    $('#fAmount').value = record.amount;
+    $('#fUnitPrice').value = '';
+    $('#fQuantity').value = '';
+    setCalcMode('amount');
+  }
   $('#entryTitle').textContent = `修改记录 #${record.id}`;
   $('#submitBtn').textContent = '保存修改';
   $('#cancelEditBtn').hidden = false;
@@ -384,21 +431,25 @@ function exitEditMode() {
   $('#recordForm').classList.remove('is-editing');
 }
 
-// 记完一笔后：保留日期与类型，仅清空金额 / 分类 / 备注，方便连续录入
+// 记完一笔后：保留日期、类型与计价方式，仅清空金额 / 单价 / 数量 / 分类 / 备注，方便连续录入
 function clearFormForNext() {
   exitEditMode();
   $('#fAmount').value = '';
+  $('#fUnitPrice').value = '';
+  $('#fQuantity').value = '';
   $('#fCategory').value = '';
   $('#fNote').value = '';
+  if (state.calcMode === 'unit') updateComputed();
   syncCategoryOptions();
 }
 
-// 完全恢复默认：日期回到今天、类型回到支出（用于取消编辑、刷新等操作）
+// 完全恢复默认：日期回到今天、类型回到支出、计价方式回到金额（用于取消编辑、刷新等操作）
 function resetForm() {
   exitEditMode();
   $('#recordForm').reset();
   $('#fDate').value = todayStr();
   $('#fCategory').value = '';
+  setCalcMode('amount');
   syncCategoryOptions();
 }
 
@@ -432,6 +483,8 @@ const HEADER_MAP = {
   date: ['日期', 'date', '时间'],
   type: ['类型', 'type', '收支', '收支类型'],
   amount: ['金额', 'amount', '金额(元)', '金额（元）'],
+  unitPrice: ['单价', 'unitPrice', 'unit_price', '单价(元)', '单价（元）'],
+  quantity: ['数量', 'quantity', '数目', 'qty'],
   category: ['分类', 'category'],
   note: ['备注', 'note', '说明', '描述'],
 };
@@ -478,12 +531,22 @@ function convertImportRow(raw, header) {
   const date = toDateString(get('date'));
   const type = normalizeType(get('type'));
   const amount = parseAmount(get('amount'));
+  const unitPrice = parseAmount(get('unitPrice'));
+  const quantity = parseAmount(get('quantity'));
   const category = String(get('category') ?? '').trim() || '其他';
   const note = String(get('note') ?? '').trim();
 
   if (!date) return { ok: false, error: `日期无效「${String(get('date') ?? '空')}」` };
   if (!type) return { ok: false, error: `类型无效「${String(get('type') ?? '空')}」（应为「支出」或「收入」）` };
-  if (amount === null || amount <= 0) return { ok: false, error: `金额无效「${String(get('amount') ?? '空')}」` };
+
+  // 单价与数量都填了：金额由它们计算（金额列可留空）
+  if (Number.isFinite(unitPrice) && unitPrice > 0 && Number.isFinite(quantity) && quantity > 0) {
+    return { ok: true, record: { date, type, unitPrice, quantity, category, note } };
+  }
+
+  if (amount === null || amount <= 0) {
+    return { ok: false, error: `金额无效「${String(get('amount') ?? '空')}」（也可填写单价与数量自动计算）` };
+  }
 
   return { ok: true, record: { date, type, amount, category, note } };
 }
@@ -497,8 +560,8 @@ async function parseImportFile(file) {
   if (!rawRows.length) throw new Error('工作表里没有数据行');
 
   const header = mapHeader(rawRows[0]);
-  if (header.date === undefined || header.type === undefined || header.amount === undefined) {
-    throw new Error('缺少必需列：日期、类型、金额（表头请参照样例文件）');
+  if (header.date === undefined || header.type === undefined) {
+    throw new Error('缺少必需列：日期、类型（金额列 或 单价 + 数量列至少填一种，表头请参照样例文件）');
   }
 
   const records = [];
@@ -537,14 +600,14 @@ function downloadSample() {
     return;
   }
   const rows = [
-    ['日期', '类型', '金额', '分类', '备注'],
-    ['2026-09-24', '支出', 35.5, '餐饮', '午餐'],
-    ['2026-09-24', '收入', 12000, '工资', '9月工资'],
-    ['2026-09-25', '支出', 120.25, '交通', '打车'],
-    ['2026-09-26', '收入', 500, '红包', '分类 / 备注可留空'],
+    ['日期', '类型', '金额', '分类', '备注', '单价', '数量'],
+    ['2026-09-24', '支出', 35.5, '餐饮', '午餐（直接填金额）', '', ''],
+    ['2026-09-24', '收入', 12000, '工资', '9月工资', '', ''],
+    ['2026-09-25', '支出', '', '水果', '按单价 × 数量计价：金额可留空', 3.5, 2.5],
+    ['2026-09-26', '收入', 500, '红包', '分类 / 备注可留空', '', ''],
   ];
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 22 }];
+  ws['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 10 }, { wch: 8 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '流水记录');
   XLSX.writeFile(wb, '流水记录导入样例.xlsx');
@@ -556,14 +619,29 @@ async function handleSubmit(event) {
   const payload = {
     date: $('#fDate').value,
     type: $('#fType').value,
-    amount: $('#fAmount').value,
     category: $('#fCategory').value.trim(),
     note: $('#fNote').value.trim(),
   };
 
   if (!payload.date) return toast('请选择日期', 'error');
-  const amount = Number(payload.amount);
-  if (!Number.isFinite(amount) || amount <= 0) return toast('请输入大于 0 的金额', 'error');
+
+  if (state.calcMode === 'unit') {
+    // 单价 × 数量：金额由后端按 Math.round(单价分 × 数量) 计算，保留两位小数
+    const unitPrice = Number($('#fUnitPrice').value);
+    const quantity = Number($('#fQuantity').value);
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) return toast('请输入大于 0 的单价', 'error');
+    if (!Number.isFinite(quantity) || quantity <= 0) return toast('请输入大于 0 的数量', 'error');
+    if (Math.round(unitPrice * 100 * quantity) <= 0) return toast('单价 × 数量 计算出的金额必须大于 0', 'error');
+    payload.unitPrice = unitPrice;
+    payload.quantity = quantity;
+  } else {
+    const amount = Number($('#fAmount').value);
+    if (!Number.isFinite(amount) || amount <= 0) return toast('请输入大于 0 的金额', 'error');
+    payload.amount = amount;
+    // 显式清零单价与数量，避免编辑「单价 × 数量」记录后切回金额模式时金额被旧值覆盖
+    payload.unitPrice = 0;
+    payload.quantity = 0;
+  }
 
   try {
     if (state.editingId) {
@@ -684,6 +762,12 @@ function bindEvents() {
     if (e.target === $('#importModal')) closeImportModal();
   });
 
+  $('#calcModeSwitch').addEventListener('click', (e) => {
+    const btn = e.target.closest('.seg');
+    if (btn) setCalcMode(btn.dataset.calc);
+  });
+  ['#fUnitPrice', '#fQuantity'].forEach((sel) => $(sel).addEventListener('input', updateComputed));
+
   $('#fType').addEventListener('change', syncCategoryOptions);
   $('#recordForm').addEventListener('submit', handleSubmit);
   $('#cancelEditBtn').addEventListener('click', resetForm);
@@ -740,10 +824,19 @@ function bindEvents() {
   });
 
   $('#exportRecordBtn').addEventListener('click', () => {
-    const rows = [['日期', '类型', '分类', '金额', '备注']];
+    const rows = [['日期', '类型', '分类', '金额', '单价', '数量', '计价方式', '备注']];
     for (const r of state.data.records) {
-      rows.push([r.date, r.type === 'income' ? '收入' : '支出', r.category,
-        (r.type === 'income' ? '' : '-') + r.amount.toFixed(2), r.note]);
+      const useUnit = Number(r.unitPrice) > 0 && Number(r.quantity) > 0;
+      rows.push([
+        r.date,
+        r.type === 'income' ? '收入' : '支出',
+        r.category,
+        (r.type === 'income' ? '' : '-') + r.amount.toFixed(2),
+        useUnit ? r.unitPrice.toFixed(2) : '',
+        useUnit ? formatQuantity(r.quantity) : '',
+        useUnit ? '单价×数量' : '直接金额',
+        r.note,
+      ]);
     }
     downloadCsv(`流水记录_${state.year}_${state.month}.csv`, rows);
   });

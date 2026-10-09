@@ -12,14 +12,16 @@ const db = new DatabaseSync(DB_PATH);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS records (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    date         TEXT    NOT NULL,
-    type         TEXT    NOT NULL CHECK (type IN ('income', 'expense')),
-    amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
-    category     TEXT    NOT NULL DEFAULT '其他',
-    note         TEXT    NOT NULL DEFAULT '',
-    created_at   TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
-    updated_at   TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    date             TEXT    NOT NULL,
+    type             TEXT    NOT NULL CHECK (type IN ('income', 'expense')),
+    amount_cents     INTEGER NOT NULL CHECK (amount_cents > 0),
+    unit_price_cents INTEGER NOT NULL DEFAULT 0,
+    quantity         REAL    NOT NULL DEFAULT 0,
+    category         TEXT    NOT NULL DEFAULT '其他',
+    note             TEXT    NOT NULL DEFAULT '',
+    created_at       TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at       TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
 
   CREATE INDEX IF NOT EXISTS idx_records_date ON records (date);
@@ -32,6 +34,17 @@ db.exec(`
     UNIQUE (name, type)
   );
 `);
+
+/** 老库升级：SQLite 的 ADD COLUMN 不支持 IF NOT EXISTS，这里先查后加 */
+function ensureColumn(table, column, ddl) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (columns.some((item) => item.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+}
+
+// 「单价 × 数量」计价模式：单价存分，数量可为小数；两者都大于 0 时金额由后端计算
+ensureColumn('records', 'unit_price_cents', 'unit_price_cents INTEGER NOT NULL DEFAULT 0');
+ensureColumn('records', 'quantity', 'quantity REAL NOT NULL DEFAULT 0');
 
 const DEFAULT_CATEGORIES = {
   expense: ['餐饮', '交通', '购物', '居住', '娱乐', '医疗', '教育', '通讯', '人情', '其他'],
@@ -100,6 +113,30 @@ function normalizeText(value, field, maxLen = 100, defaultValue = '') {
   return text || defaultValue;
 }
 
+/** 单价（元）-> 分；空值返回 0，表示该记录不使用「单价 × 数量」计价 */
+function normalizeUnitPrice(value) {
+  if (value === undefined || value === null || value === '') return 0;
+  const num = typeof value === 'string' ? Number(value.trim()) : value;
+  if (!Number.isFinite(num) || num < 0) throw httpError(400, '单价必须是不小于 0 的数字');
+  const cents = Math.round(num * 100);
+  if (cents > 1e14) throw httpError(400, '单价超出合理范围');
+  return cents;
+}
+
+/** 数量；空值返回 0，表示该记录不使用「单价 × 数量」计价 */
+function normalizeQuantity(value) {
+  if (value === undefined || value === null || value === '') return 0;
+  const num = typeof value === 'string' ? Number(value.trim()) : value;
+  if (!Number.isFinite(num) || num < 0) throw httpError(400, '数量必须是不小于 0 的数字');
+  if (num > 1e9) throw httpError(400, '数量超出合理范围');
+  return num;
+}
+
+/** 单价 × 数量 -> 金额（分）。以分为单位四舍五入，等价于保留两位小数 */
+function amountFromUnitPrice(unitPriceCents, quantity) {
+  return Math.round(unitPriceCents * quantity);
+}
+
 function parseRecordInput(payload = {}, { partial = false } = {}) {
   const body = payload && typeof payload === 'object' ? payload : {};
   const out = {};
@@ -114,12 +151,30 @@ function parseRecordInput(payload = {}, { partial = false } = {}) {
     }
     out.type = body.type;
   }
-  if (!partial || body.amount !== undefined) {
-    if (body.amount === undefined || body.amount === null || body.amount === '') {
-      throw httpError(400, '金额不能为空');
-    }
-    out.amount_cents = normalizeAmount(body.amount);
+
+  if (!partial || body.unitPrice !== undefined) {
+    out.unit_price_cents = normalizeUnitPrice(body.unitPrice);
   }
+  if (!partial || body.quantity !== undefined) {
+    out.quantity = normalizeQuantity(body.quantity);
+  }
+
+  // 单价与数量都大于 0 时，金额由它们计算（忽略传入的金额），保证三者一致
+  const byUnitPrice = !partial && (out.unit_price_cents || 0) > 0 && (out.quantity || 0) > 0;
+
+  if (!partial || body.amount !== undefined) {
+    if (byUnitPrice) {
+      const computed = amountFromUnitPrice(out.unit_price_cents, out.quantity);
+      if (computed <= 0) throw httpError(400, '单价 × 数量 计算出的金额必须大于 0');
+      out.amount_cents = computed;
+    } else {
+      if (body.amount === undefined || body.amount === null || body.amount === '') {
+        throw httpError(400, '金额不能为空（也可填写单价与数量自动计算）');
+      }
+      out.amount_cents = normalizeAmount(body.amount);
+    }
+  }
+
   if (!partial || body.category !== undefined) {
     out.category = normalizeText(body.category, '分类', 30, '其他');
   }
@@ -127,7 +182,7 @@ function parseRecordInput(payload = {}, { partial = false } = {}) {
     out.note = normalizeText(body.note, '备注', 200, '');
   }
   if (!partial) {
-    for (const key of ['date', 'type', 'amount_cents', 'category', 'note']) {
+    for (const key of ['date', 'type', 'amount_cents', 'unit_price_cents', 'quantity', 'category', 'note']) {
       if (out[key] === undefined) throw httpError(400, '提交的数据不完整');
     }
   }
@@ -140,6 +195,8 @@ function toRecord(row) {
     date: row.date,
     type: row.type,
     amount: row.amount_cents / 100,
+    unitPrice: (row.unit_price_cents || 0) / 100,
+    quantity: Number(row.quantity) || 0,
     category: row.category,
     note: row.note,
     updatedAt: row.updated_at,
@@ -203,10 +260,18 @@ function createRecord(payload) {
   ensureCategory(data.category, data.type);
   const info = db
     .prepare(
-      `INSERT INTO records (date, type, amount_cents, category, note)
-       VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO records (date, type, amount_cents, unit_price_cents, quantity, category, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(data.date, data.type, data.amount_cents, data.category, data.note);
+    .run(
+      data.date,
+      data.type,
+      data.amount_cents,
+      data.unit_price_cents,
+      data.quantity,
+      data.category,
+      data.note
+    );
   return getRecord(info.lastInsertRowid);
 }
 
@@ -215,15 +280,18 @@ function updateRecord(id, payload) {
   const existing = db.prepare('SELECT * FROM records WHERE id = ?').get(recordId);
   if (!existing) throw httpError(404, '记录不存在或已被删除');
 
-  const data = parseRecordInput(payload, { partial: true });
-  const keys = Object.keys(data);
-  if (!keys.length) throw httpError(400, '没有需要更新的字段');
+  const patch = payload && typeof payload === 'object' ? payload : {};
+  if (!Object.keys(patch).length) throw httpError(400, '没有需要更新的字段');
 
-  ensureCategory(data.category ?? existing.category, data.type ?? existing.type);
-  const assignments = keys.map((key) => `${key} = ?`).join(', ');
+  // 与现有数据合并后整体校验：这样只改数量时，金额也会按「单价 × 数量」重新计算
+  const merged = parseRecordInput(Object.assign({}, toRecord(existing), patch));
+  if (merged.amount_cents <= 0) throw httpError(400, '金额必须大于 0');
+
+  const fields = ['date', 'type', 'amount_cents', 'unit_price_cents', 'quantity', 'category', 'note'];
+  ensureCategory(merged.category, merged.type);
   db.prepare(
-    `UPDATE records SET ${assignments}, updated_at = datetime('now', 'localtime') WHERE id = ?`
-  ).run(...keys.map((key) => data[key]), recordId);
+    `UPDATE records SET ${fields.map((key) => `${key} = ?`).join(', ')}, updated_at = datetime('now', 'localtime') WHERE id = ?`
+  ).run(...fields.map((key) => merged[key]), recordId);
 
   return getRecord(recordId);
 }
@@ -241,7 +309,7 @@ function importRecords(records) {
   if (records.length > 5000) throw httpError(400, '单次最多导入 5000 条记录');
 
   const insert = db.prepare(
-    'INSERT INTO records (date, type, amount_cents, category, note) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO records (date, type, amount_cents, unit_price_cents, quantity, category, note) VALUES (?, ?, ?, ?, ?, ?, ?)'
   );
 
   const insertedIds = [];
@@ -254,7 +322,15 @@ function importRecords(records) {
       try {
         const data = parseRecordInput(raw);
         ensureCategory(data.category, data.type);
-        const info = insert.run(data.date, data.type, data.amount_cents, data.category, data.note);
+        const info = insert.run(
+          data.date,
+          data.type,
+          data.amount_cents,
+          data.unit_price_cents,
+          data.quantity,
+          data.category,
+          data.note
+        );
         insertedIds.push(Number(info.lastInsertRowid));
       } catch (err) {
         errors.push({ row: rowNo, message: err.message || '数据不合法' });

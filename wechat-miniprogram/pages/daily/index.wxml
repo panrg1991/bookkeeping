@@ -76,6 +76,7 @@
               <text class="detail-cat">{{rec.category}}</text>
               <text class="detail-amount {{rec.amountCls}}">{{rec.amount}}</text>
             </view>
+            <view class="detail-unit muted" wx:if="{{rec.unitPriceText}}">{{rec.unitPriceText}}（单价 × 数量）</view>
             <view class="detail-note muted" wx:if="{{rec.note}}">{{rec.note}}</view>
           </view>
           <view class="detail-actions">

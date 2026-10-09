@@ -3,6 +3,20 @@ const fmt = require('../../utils/format');
 
 const MONTH_OPTIONS = ['全年', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
+/** 数量展示：整数不带小数，小数最多 3 位 */
+function formatQuantity(value) {
+  const num = Number(value) || 0;
+  return Number.isInteger(num) ? String(num) : String(Number(num.toFixed(3)));
+}
+
+/** 「单价 × 数量」展示文本，如 ¥3.50 × 2.5 */
+function unitPriceText(record) {
+  const unitPriceCents = Number(record.unitPriceCents) || 0;
+  const quantity = Number(record.quantity) || 0;
+  if (unitPriceCents <= 0 || quantity <= 0) return '';
+  return `¥${fmt.formatMoney(unitPriceCents)} × ${formatQuantity(quantity)}`;
+}
+
 Page({
   data: {
     years: [],
@@ -104,6 +118,7 @@ Page({
       category: item.category,
       amount: `${item.type === 'income' ? '+' : '-'}${fmt.formatMoney(item.amountCents)}`,
       amountCls: item.type === 'income' ? 'income-text' : 'expense-text',
+      unitPriceText: unitPriceText(item),
       note: item.note,
     }));
   },

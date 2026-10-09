@@ -71,11 +71,14 @@ Page({
     logs: [],
     hasMore: false,
     loading: true,
+    mode: store.mode,
+    account: { masked: '', env: '', full: '' },
   },
 
   offset: 0,
 
   onShow() {
+    this.loadAccount();
     this.refresh();
   },
 
@@ -86,6 +89,33 @@ Page({
   onFilterChange(e) {
     this.setData({ filterAction: e.currentTarget.dataset.value });
     this.refresh();
+  },
+
+  /** 当前账号信息：openid 由微信自动注入，这里只用于排查数据归属 */
+  async loadAccount() {
+    try {
+      const info = await store.whoami();
+      this.setData({
+        account: {
+          masked: info.openidMasked || '(未获取到)',
+          env: info.envId || '默认环境',
+          full: info.openid || '',
+        },
+      });
+    } catch (err) {
+      // 账号信息仅用于排查，拉取失败不影响日志展示
+    }
+  },
+
+  onCopyOpenid() {
+    if (!this.data.account.full) {
+      wx.showToast({
+        title: store.mode === 'cloud' ? '未获取到 openid' : '本地模式没有 openid',
+        icon: 'none',
+      });
+      return;
+    }
+    wx.setClipboardData({ data: this.data.account.full });
   },
 
   async refresh() {

@@ -1,6 +1,12 @@
 <view class="page">
   <view class="card">
     <view class="card-title">操作日志概览</view>
+    <view class="account-line" bindtap="onCopyOpenid">
+      <text class="muted">当前账号：{{account.masked}}</text>
+      <text class="account-copy">复制 openid</text>
+    </view>
+    <view class="muted">数据模式：{{mode === 'cloud' ? '云开发（多端同步）' : '本地存储（仅本机）'}}</view>
+    <view class="muted" wx:if="{{mode === 'cloud'}}">云环境：{{account.env}}</view>
     <view class="muted">共 {{total}} 条（只包含本人的操作记录）</view>
     <view class="stat-line" wx:if="{{stats.length}}">
       <text class="stat-item" wx:for="{{stats}}" wx:key="key">{{item.label}} {{item.value}}</text>

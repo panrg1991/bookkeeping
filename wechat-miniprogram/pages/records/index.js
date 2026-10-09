@@ -4,7 +4,21 @@ const fmt = require('../../utils/format');
 const MONTH_OPTIONS = ['全年', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
 function emptyForm() {
-  return { date: fmt.todayStr(), type: 'expense', amount: '', category: '', note: '' };
+  return { date: fmt.todayStr(), type: 'expense', amount: '', unitPrice: '', quantity: '', category: '', note: '' };
+}
+
+/** 数量展示：整数不带小数，小数最多 3 位 */
+function formatQuantity(value) {
+  const num = Number(value) || 0;
+  return Number.isInteger(num) ? String(num) : String(Number(num.toFixed(3)));
+}
+
+/** 「单价 × 数量」展示文本，如 ¥3.50 × 2.5 */
+function unitPriceText(record) {
+  const unitPriceCents = Number(record.unitPriceCents) || 0;
+  const quantity = Number(record.quantity) || 0;
+  if (unitPriceCents <= 0 || quantity <= 0) return '';
+  return `¥${fmt.formatMoney(unitPriceCents)} × ${formatQuantity(quantity)}`;
 }
 
 /** 解析粘贴进来的 Excel 内容（Tab 分隔）或 CSV 文本 */
@@ -35,12 +49,25 @@ function parsePastedText(text) {
     const date = store.toDateString(cells[0]);
     const type = store.toType(cells[1]);
     const amountCents = store.toAmountCents(cells[2]);
-    if (!date || !type || !amountCents || amountCents <= 0) {
+    // 可选的第 6、7 列：单价、数量（两者都填时金额由它们计算，金额列可留空）
+    const unitPriceCents = store.toAmountCents(cells[5]);
+    const quantityRaw = cells[6] === undefined ? NaN : Number(cells[6]);
+    const quantity = Number.isFinite(quantityRaw) ? quantityRaw : 0;
+    const useUnit = !!(unitPriceCents > 0 && quantity > 0);
+
+    if (!date || !type || (!useUnit && !(amountCents > 0))) {
       skipped += 1;
       return;
     }
 
-    items.push({ date, type, amountCents, category: cells[3] || '其他', note: cells[4] || '' });
+    const item = { date, type, category: cells[3] || '其他', note: cells[4] || '' };
+    if (useUnit) {
+      item.unitPriceCents = unitPriceCents;
+      item.quantity = quantity;
+    } else {
+      item.amountCents = amountCents;
+    }
+    items.push(item);
   });
 
   return { items, skipped };
@@ -57,6 +84,8 @@ Page({
     filterType: 'all',
     keyword: '',
     form: emptyForm(),
+    calcMode: 'amount',
+    computedAmount: '0.00',
     categoryOptions: [],
     editingId: null,
     records: [],
@@ -81,17 +110,7 @@ Page({
       try {
         const record = await store.getRecord(id);
         if (record) {
-          this.setData({
-            editingId: record.id,
-            form: {
-              date: record.date,
-              type: record.type,
-              amount: fmt.centsToYuanInput(record.amountCents),
-              category: record.category,
-              note: record.note,
-            },
-          });
-          this.syncCategoryOptions(record.type);
+          this.fillForm(record);
           wx.pageScrollTo({ scrollTop: 0, duration: 0 });
         }
       } catch (err) {
@@ -159,8 +178,36 @@ Page({
     this.syncCategoryOptions(type);
   },
 
+  /** 切换计价方式：直接填金额 / 单价 × 数量 */
+  onCalcModeChange(e) {
+    const calcMode = e.currentTarget.dataset.mode === 'unit' ? 'unit' : 'amount';
+    this.setData({ calcMode });
+    this.updateComputed();
+  },
+
   onAmountInput(e) {
     this.setData({ 'form.amount': e.detail.value });
+  },
+
+  onUnitPriceInput(e) {
+    this.setData({ 'form.unitPrice': e.detail.value });
+    this.updateComputed();
+  },
+
+  onQuantityInput(e) {
+    this.setData({ 'form.quantity': e.detail.value });
+    this.updateComputed();
+  },
+
+  /** 单价 × 数量 实时计算，保留两位小数（与数据层 Math.round(单价分 × 数量) 一致） */
+  updateComputed() {
+    const { form } = this.data;
+    const unitPriceCents = fmt.yuanToCents(form.unitPrice);
+    const quantity = Number(form.quantity);
+    const valid = unitPriceCents > 0 && Number.isFinite(quantity) && quantity > 0;
+    this.setData({
+      computedAmount: valid ? fmt.formatMoney(Math.round(unitPriceCents * quantity)) : '0.00',
+    });
   },
 
   onCategoryInput(e) {
@@ -180,33 +227,75 @@ Page({
     wx.showToast({ title: '已退出编辑', icon: 'none' });
   },
 
-  /** 完全恢复默认：日期今天、类型支出 */
+  /** 把一条记录回填到表单，并按是否使用「单价 × 数量」自动切换计价方式 */
+  fillForm(record) {
+    const useUnit = Number(record.unitPriceCents) > 0 && Number(record.quantity) > 0;
+    this.setData({
+      editingId: record.id,
+      calcMode: useUnit ? 'unit' : 'amount',
+      form: {
+        date: record.date,
+        type: record.type,
+        amount: useUnit ? '' : fmt.centsToYuanInput(record.amountCents),
+        unitPrice: useUnit ? fmt.centsToYuanInput(record.unitPriceCents) : '',
+        quantity: useUnit ? formatQuantity(record.quantity) : '',
+        category: record.category,
+        note: record.note,
+      },
+    });
+    this.syncCategoryOptions(record.type);
+    this.updateComputed();
+  },
+
+  /** 完全恢复默认：日期今天、类型支出、计价方式为金额 */
   resetForm() {
     const form = emptyForm();
-    this.setData({ editingId: null, form });
+    this.setData({ editingId: null, form, calcMode: 'amount', computedAmount: '0.00' });
     this.syncCategoryOptions(form.type);
   },
 
   async onSubmit() {
-    const form = this.data.form;
-    const amountCents = fmt.yuanToCents(form.amount);
-
+    const { form, calcMode } = this.data;
     if (!form.date) {
       wx.showToast({ title: '请选择日期', icon: 'none' });
-      return;
-    }
-    if (!amountCents || amountCents <= 0) {
-      wx.showToast({ title: '请输入大于 0 的金额', icon: 'none' });
       return;
     }
 
     const payload = {
       date: form.date,
       type: form.type,
-      amountCents,
       category: form.category,
       note: form.note,
     };
+
+    if (calcMode === 'unit') {
+      const unitPriceCents = fmt.yuanToCents(form.unitPrice);
+      const quantity = Number(form.quantity);
+      if (!(unitPriceCents > 0)) {
+        wx.showToast({ title: '请输入大于 0 的单价', icon: 'none' });
+        return;
+      }
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        wx.showToast({ title: '请输入大于 0 的数量', icon: 'none' });
+        return;
+      }
+      if (Math.round(unitPriceCents * quantity) <= 0) {
+        wx.showToast({ title: '单价 × 数量 计算出的金额必须大于 0', icon: 'none' });
+        return;
+      }
+      payload.unitPriceCents = unitPriceCents;
+      payload.quantity = quantity;
+    } else {
+      const amountCents = fmt.yuanToCents(form.amount);
+      if (!(amountCents > 0)) {
+        wx.showToast({ title: '请输入大于 0 的金额', icon: 'none' });
+        return;
+      }
+      payload.amountCents = amountCents;
+      // 显式清零，避免编辑「单价 × 数量」记录后切回金额模式时金额被旧值覆盖
+      payload.unitPriceCents = 0;
+      payload.quantity = 0;
+    }
 
     wx.showLoading({ title: '保存中', mask: true });
     try {
@@ -220,11 +309,20 @@ Page({
         wx.showToast({ title: '已保存', icon: 'success' });
       }
 
-      // 保留日期与类型，只清空金额 / 分类 / 备注，方便连续录入
+      // 保留日期、类型与计价方式，只清空金额 / 单价 / 数量 / 分类 / 备注，方便连续录入
       this.setData({
         editingId: null,
-        form: { date: form.date, type: form.type, amount: '', category: '', note: '' },
+        form: {
+          date: form.date,
+          type: form.type,
+          amount: '',
+          unitPrice: '',
+          quantity: '',
+          category: '',
+          note: '',
+        },
       });
+      this.updateComputed();
       this.refresh();
     } catch (err) {
       wx.hideLoading();
@@ -244,17 +342,7 @@ Page({
         wx.showToast({ title: '记录不存在', icon: 'none' });
         return;
       }
-      this.setData({
-        editingId: record.id,
-        form: {
-          date: record.date,
-          type: record.type,
-          amount: fmt.centsToYuanInput(record.amountCents),
-          category: record.category,
-          note: record.note,
-        },
-      });
-      this.syncCategoryOptions(record.type);
+      this.fillForm(record);
       wx.pageScrollTo({ scrollTop: 0, duration: 150 });
     } catch (err) {
       wx.hideLoading();
@@ -375,6 +463,7 @@ Page({
           note: item.note,
           amount: `${item.type === 'income' ? '+' : '-'}${fmt.formatMoney(item.amountCents)}`,
           amountCls: item.type === 'income' ? 'income-text' : 'expense-text',
+          unitPriceText: unitPriceText(item),
         })),
       });
     } catch (err) {

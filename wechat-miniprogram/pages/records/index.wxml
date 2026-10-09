@@ -43,9 +43,40 @@
     </view>
 
     <view class="field">
+      <text class="field-label">计价方式</text>
+      <view class="segmented inline">
+        <view
+          class="segment {{calcMode === 'amount' ? 'active' : ''}}"
+          data-mode="amount"
+          bindtap="onCalcModeChange"
+        >直接填金额</view>
+        <view
+          class="segment {{calcMode === 'unit' ? 'active' : ''}}"
+          data-mode="unit"
+          bindtap="onCalcModeChange"
+        >单价 × 数量</view>
+      </view>
+    </view>
+
+    <view class="field" wx:if="{{calcMode === 'amount'}}">
       <text class="field-label">金额（元）</text>
       <input class="field-input" type="digit" placeholder="0.00" value="{{form.amount}}" bindinput="onAmountInput" />
     </view>
+
+    <block wx:else>
+      <view class="field">
+        <text class="field-label">单价（元）</text>
+        <input class="field-input" type="digit" placeholder="0.00" value="{{form.unitPrice}}" bindinput="onUnitPriceInput" />
+      </view>
+      <view class="field">
+        <text class="field-label">数量</text>
+        <input class="field-input" type="digit" placeholder="1" value="{{form.quantity}}" bindinput="onQuantityInput" />
+      </view>
+      <view class="field">
+        <text class="field-label">金额（自动）</text>
+        <text class="computed-amount">￥{{computedAmount}}</text>
+      </view>
+    </block>
 
     <view class="field">
       <text class="field-label">分类</text>
@@ -97,6 +128,9 @@
         <text class="tag {{item.type}}">{{item.typeLabel}}</text>
         <text class="rec-cat">{{item.category}}</text>
         <text class="rec-amount {{item.amountCls}}">{{item.amount}}</text>
+      </view>
+      <view class="rec-unit" wx:if="{{item.unitPriceText}}">
+        <text class="muted">{{item.unitPriceText}}（单价 × 数量）</text>
       </view>
       <view class="rec-meta">
         <text class="muted">{{item.date}}</text>

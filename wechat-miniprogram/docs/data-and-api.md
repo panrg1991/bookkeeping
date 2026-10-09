@@ -1,23 +1,34 @@
 # 数据存储与接口调用说明
 
-本文说明小程序版**数据存在哪里、怎么按用户隔离、页面怎么调用**，以及日志与后续扩展方式。
-云数据库的建库、权限、索引与部署细节见 **[cloud-database.md](cloud-database.md)**。
+本文说明小程序版**数据存在哪里、怎么按用户隔离、页面怎么调用**，以及日志与模式切换。
+云数据库的建库、权限、索引与部署细节见 **[cloud-database.md](cloud-database.md)**；配置与切换清单见 **[deploy-checklist.md](deploy-checklist.md)**。
 
-## 一、总体结论
+## 一、两种模式与总体结论
 
-| 问题 | 小程序版的处理方式 |
-| --- | --- |
-| 用什么数据库 | **微信云开发数据库**，三个集合：`records`（记账数据）、`logs`（操作日志）、`settings`（分类字典） |
-| 数据怎么跟用户关联 | 每个文档都带 `_openid`；云函数用 `cloud.getWXContext().OPENID` 识别用户，**前端传什么都不采信** |
-| 有没有后端服务 | 没有自建服务，使用**云函数** `bookkeeping` 作为唯一数据出入口 |
-| 页面怎么调用 | 页面 → `utils/store.js`（异步方法）→ `wx.cloud.callFunction({ name: 'bookkeeping' })` → 云函数 |
-| 需要配置服务器域名吗 | **不需要**。`wx.cloud.callFunction` 走微信内部通道，无需 HTTPS 域名与备案 |
-| 需要云环境吗 | **需要**。开通云开发后把环境 ID 填到 `utils/config.js` 的 `envId` |
-| 数据在哪台设备上 | 存云端，**同一微信用户换设备自动同步**；不同微信账号之间完全隔离 |
-| 金额精度怎么保证 | 与 Web 版一致：一律以「分」为单位的整数（`amountCents`）存取 |
-| 操作能追溯吗 | 能。每次写操作都会在 `logs` 集合留一条日志（含前后数据、变更字段、失败原因），小程序内可查看 |
+小程序端有**两种数据模式**，由 `utils/config.js` 的 `mode` 决定，**页面代码完全一致**：
 
-## 二、集合结构
+| | 本地存储（当前默认，`mode: 'local'`） | 云开发数据库（`mode: 'cloud'`） |
+| --- | --- | --- |
+| 实现文件 | `utils/store.local.js` | `utils/store.cloud.js` + 云函数 `bookkeeping` |
+| 数据位置 | `wx.setStorageSync`：`bk:records` / `bk:categories` / `bk:seq` / `bk:logs` | 云数据库集合：`records` / `logs` / `settings` |
+| 用户隔离 | 按设备 + 微信账号（无用户体系，不涉及 openid） | 按 `_openid`（云函数自动识别，前端无法伪造） |
+| 后端服务 | 无 | 云函数（无需自建服务器、域名、备案） |
+| 多端同步 | ❌ 仅本机 | ✅ 同一微信账号自动同步 |
+| 需要云环境 | ❌ 不需要（游客模式也能跑） | ✅ 需要（`envId` + 部署云函数 + 建集合 + 配权限） |
+| 操作日志 | 本地 `bk:logs`，滚动保留 500 条 | 云端 `logs` 集合，无条数上限 |
+| 需要真实 AppID | 仅发布时需要 | **是**（游客模式无法使用云开发） |
+
+两种模式的共同点：
+
+- 页面只调用 `utils/store.js`（门面），它按 `mode` 加载实现并**统一包装成 Promise**，因此页面里 `await store.xxx()` 的写法在两种模式下都一样，切换模式不用改页面
+- 每次写操作都会留一条操作日志（含前后数据、变更字段、失败原因），可在「流水记录 → 操作日志」查看
+- `listRecords` 等查询返回结构一致：`{ total, items }`
+- 均**无需配置服务器合法域名**（本地模式不发请求；云模式走微信内部通道）
+- 金额一律以「分」为单位的整数（`amountCents`）存取，避免浮点误差
+
+> 下面第二～五节的字段与集合结构描述**云开发模式**；本地模式的存储键见上表与 [README](../README.md)。
+
+## 二、集合结构（云开发模式）
 
 ### `records`（记账数据）
 
@@ -28,6 +39,8 @@
   date: '2026-09-24',      // YYYY-MM-DD
   type: 'expense',         // 'income' 收入 / 'expense' 支出
   amountCents: 3550,       // 金额（分）→ 35.50 元
+  unitPriceCents: 0,       // 单价（分）；与 quantity 同时 > 0 时，金额由两者计算
+  quantity: 0,             // 数量（可为小数）
   category: '餐饮',
   note: '午餐',
   createdAt: Date, createdAtMs: 1758691200000,
@@ -65,6 +78,7 @@
 | 小程序 `store.js` 方法 | 云函数 action | 说明 |
 | --- | --- | --- |
 | `init()` | `ping` | 启动自检，确认云函数可用 |
+| `whoami()` | `whoami` | 当前账号 openid（脱敏）与环境 ID，排查数据归属用 |
 | `initDb()` | `initDb` | 首次部署创建集合 |
 | `listRecords(options)` | `listRecords` | `{ year, month, day, type, category, keyword, limit, offset }`，返回 `{ total, items }` |
 | `getRecord(id)` | `getRecord` | 取单条，无权或不存在返回 `null` |

@@ -2,8 +2,16 @@
   width: 100%;
 }
 
+/**
+ * 横向滚动表格的宽度必须 ≥ 各列固定宽之和 + .tr 的左右内边距，否则滑到最右侧时
+ * 最后一列（笔数）会被裁切/遮挡。
+ *
+ * 列宽：月份 160 + 数字列 190 × 4 + 笔数 130 = 1050rpx
+ * 内边距：.tr 左右各 20rpx → 40rpx
+ * 合计需要 1090rpx，这里取 1120rpx，右侧留约 30rpx 余量。
+ */
 .table.fixed {
-  width: 1020rpx;
+  width: 1120rpx;
 }
 
 .table.fixed .td {
@@ -17,11 +25,11 @@
 }
 
 .table.fixed .td.col-num {
-  width: 184rpx;
+  width: 190rpx;
 }
 
 .table.fixed .td.col-count {
-  width: 120rpx;
+  width: 130rpx;
 }
 
 .tip {

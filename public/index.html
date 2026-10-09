@@ -15,6 +15,13 @@
         <p>收入 · 支出 · 利润，Excel 式报表一览</p>
       </div>
     </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab is-active" data-tab="month" type="button">月度总览</button>
+      <button class="tab" data-tab="daily" type="button">每日明细</button>
+      <button class="tab" data-tab="records" type="button">流水记录</button>
+      <button class="tab" data-tab="category" type="button">分类统计</button>
+    </nav>
+
     <div class="toolbar">
       <label>年份
         <select id="yearSelect"></select>
@@ -27,13 +34,6 @@
   </header>
 
   <section class="cards" id="cards"></section>
-
-  <nav class="tabs" id="tabs">
-    <button class="tab is-active" data-tab="month" type="button">月度总览</button>
-    <button class="tab" data-tab="daily" type="button">每日明细</button>
-    <button class="tab" data-tab="records" type="button">流水记录</button>
-    <button class="tab" data-tab="category" type="button">分类统计</button>
-  </nav>
 
   <main>
     <!-- 月度总览 -->
@@ -91,8 +91,27 @@
             </select>
           </label>
           <label class="field">
+            <span>计价方式</span>
+            <div class="segmented small" id="calcModeSwitch">
+              <button class="seg is-active" data-calc="amount" type="button">直接填金额</button>
+              <button class="seg" data-calc="unit" type="button">单价 × 数量</button>
+            </div>
+          </label>
+          <label class="field" id="amountField">
             <span>金额（元）</span>
-            <input type="number" id="fAmount" step="0.01" min="0.01" placeholder="0.00" required />
+            <input type="number" id="fAmount" step="0.01" min="0.01" placeholder="0.00" />
+          </label>
+          <label class="field" id="unitPriceField" hidden>
+            <span>单价（元）</span>
+            <input type="number" id="fUnitPrice" step="0.01" min="0" placeholder="0.00" />
+          </label>
+          <label class="field" id="quantityField" hidden>
+            <span>数量</span>
+            <input type="number" id="fQuantity" step="0.01" min="0" placeholder="1" />
+          </label>
+          <label class="field" id="computedField" hidden>
+            <span>金额（自动计算，两位小数）</span>
+            <input type="text" id="fComputed" readonly placeholder="0.00" />
           </label>
           <label class="field">
             <span>分类</span>

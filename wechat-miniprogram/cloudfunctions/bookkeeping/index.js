@@ -84,14 +84,25 @@ function normalizeRecord(input) {
   const type = source.type;
   if (type !== 'income' && type !== 'expense') throw new Error('类型只能是收入或支出');
 
-  const amountCents = Math.round(Number(source.amountCents));
-  if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error('金额必须大于 0');
-  if (amountCents > 1e12) throw new Error('金额超出合理范围');
+  const unitPriceCents = Math.max(0, Math.round(Number(source.unitPriceCents) || 0));
+  const quantity = Math.max(0, Number(source.quantity) || 0);
+  if (quantity > 1e9) throw new Error('数量超出合理范围');
+
+  // 单价 × 数量 计价：两者都大于 0 时金额由它们计算（以分为单位四舍五入 = 保留两位小数）
+  let amountCents;
+  if (unitPriceCents > 0 && quantity > 0) {
+    amountCents = Math.round(unitPriceCents * quantity);
+    if (amountCents <= 0) throw new Error('单价 × 数量 计算出的金额必须大于 0');
+  } else {
+    amountCents = Math.round(Number(source.amountCents));
+    if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error('金额必须大于 0（也可填写单价与数量自动计算）');
+    if (amountCents > 1e12) throw new Error('金额超出合理范围');
+  }
 
   const category = String(source.category || '').trim().slice(0, 30) || '其他';
   const note = String(source.note || '').trim().slice(0, 200);
 
-  return { date, type, amountCents, category, note };
+  return { date, type, amountCents, unitPriceCents, quantity, category, note };
 }
 
 function pickRecord(doc) {
@@ -737,6 +748,7 @@ async function initDb(event, ctx) {
 
 const ACTIONS = {
   ping,
+  whoami,
   initDb,
   listRecords,
   getRecord,
@@ -758,6 +770,21 @@ const ACTIONS = {
 
 async function ping() {
   return { pong: true, serverTime: Date.now() };
+}
+
+/**
+ * 当前调用者信息。
+ * openid 完全由微信在调用时注入，前端不需要也无法配置；
+ * 这里返回它是为了排查「数据归属」「换账号后看不到数据」这类问题。
+ */
+async function whoami(event, ctx) {
+  const openid = ctx.openid || '';
+  return {
+    openid,
+    openidMasked: openid ? `${openid.slice(0, 6)}****${openid.slice(-4)}` : '',
+    appid: ctx.appid || '',
+    envId: process.env.TCB_ENV || process.env.SCF_NAMESPACE || '',
+  };
 }
 
 exports.main = async (event) => {

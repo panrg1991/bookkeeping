@@ -9,10 +9,11 @@
 - **按月查看**：当月每一天的支出 / 收入 / 净额，点击任意日期可展开当天多笔流水并直接修改或删除
 - **多笔明细**：同一天可记录任意多笔收支
 - **录入与维护**：表单录入（日期 / 类型 / 金额 / 分类 / 备注），支持修改、删除、分类自动补全
+- **单价 × 数量计价**：录入时可切换到「单价 × 数量」模式，金额由两者自动计算（以「分」为单位四舍五入，即金额保留两位小数）；列表、明细与 CSV 导出会一并显示单价与数量
 - **分类统计**：按支出或收入维度查看各分类金额与占比
 - **CSV 导出**：月度总览、每日明细、流水记录均可导出为 CSV（Excel 可直接打开）
 
-> **微信小程序版**：功能一致的实现位于 [`wechat-miniprogram/`](wechat-miniprogram/README.md)。小程序端使用**微信云开发数据库**（数据按微信用户 openid 隔离、多端同步）与统一云函数 `bookkeeping`（数据读写、统计聚合、操作日志全部收口在云端），**每笔数据操作都会写入操作日志**便于事后排查。数据存储与接口调用见 [docs/data-and-api.md](wechat-miniprogram/docs/data-and-api.md)，云数据库设计与部署见 [docs/cloud-database.md](wechat-miniprogram/docs/cloud-database.md)，发布上线流程（AppID / 密钥 / 审核）见 [docs/release.md](wechat-miniprogram/docs/release.md)。
+> **微信小程序版**：功能一致的实现位于 [`wechat-miniprogram/`](wechat-miniprogram/README.md)。小程序端支持两种数据模式，**当前为本地存储模式**（数据存手机本地、无需云开发、导入项目即可运行），同时完整保留**微信云开发数据库模式**（数据按 openid 隔离、多端同步、云端操作日志）—— 改 `utils/config.js` 的 `mode` 一个字段即可切换，页面代码无需改动；两种模式都会为每笔数据操作留存操作日志。配置与模式切换见 [docs/deploy-checklist.md](wechat-miniprogram/docs/deploy-checklist.md)，存储与接口见 [docs/data-and-api.md](wechat-miniprogram/docs/data-and-api.md)，云模式部署见 [docs/cloud-database.md](wechat-miniprogram/docs/cloud-database.md)，发布流程见 [docs/release.md](wechat-miniprogram/docs/release.md)。
 
 ## 运行
 
@@ -55,6 +56,8 @@ data/bookkeeping.db  数据库文件（首次运行自动生成）
 | date | TEXT | 日期 `YYYY-MM-DD` |
 | type | TEXT | `income` 收入 / `expense` 支出 |
 | amount_cents | INTEGER | 金额（分） |
+| unit_price_cents | INTEGER | 单价（分），`0` 表示该记录不使用「单价 × 数量」计价 |
+| quantity | REAL | 数量（可为小数），`0` 表示不使用；与单价同时 > 0 时，金额由 `round(单价 × 数量)` 计算 |
 | category | TEXT | 分类 |
 | note | TEXT | 备注 |
 | created_at / updated_at | TEXT | 时间戳 |
@@ -66,8 +69,8 @@ data/bookkeeping.db  数据库文件（首次运行自动生成）
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/records?year=&month=&day=&type=&category=&keyword=&limit=&offset=` | 记录列表（`month=all` 表示全年） |
-| POST | `/api/records` | 新增记录 `{date, type, amount, category, note}` |
-| PUT | `/api/records/:id` | 修改记录（支持部分字段） |
+| POST | `/api/records` | 新增记录 `{date, type, amount, category, note}`；也可用 `{unitPrice, quantity}` 替代 `amount`（两者同时 > 0 时金额由它们计算） |
+| PUT | `/api/records/:id` | 修改记录（支持部分字段；改单价或数量会自动重算金额） |
 | DELETE | `/api/records/:id` | 删除记录 |
 | GET | `/api/summary/overview?year=&month=` | 本期与全年汇总（收入 / 支出 / 利润 / 笔数） |
 | GET | `/api/summary/monthly?year=` | 12 个月统计 |

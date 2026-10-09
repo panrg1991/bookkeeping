@@ -103,6 +103,11 @@
   margin-right: 16rpx;
 }
 
+.detail-unit {
+  font-size: 22rpx;
+  margin-top: 4rpx;
+}
+
 .detail-note {
   font-size: 24rpx;
   margin-top: 6rpx;

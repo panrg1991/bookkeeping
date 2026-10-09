@@ -1,6 +1,10 @@
 # 云开发数据库设计与部署
 
-小程序端的数据已从「本地存储」切换为「微信云开发数据库」，实现**数据跟随微信用户（openid）自动关联、多端同步**，并为**每笔数据操作留下可追溯的日志**。
+> **适用范围**：本文只在 `utils/config.js` 中 `mode: 'cloud'` 时生效。
+> 小程序**当前默认是本地存储模式**（`mode: 'local'`），不依赖云开发；本地模式下的配置与运行见 [deploy-checklist.md](deploy-checklist.md)。
+> 云开发模式的代码（`cloudfunctions/bookkeeping`、`utils/store.cloud.js`）已完整保留，改一个字段即可切回。
+
+云开发模式下，数据存于**微信云开发数据库**，实现**数据跟随微信用户（openid）自动关联、多端同步**，并为**每笔数据操作留下可追溯的日志**。
 
 ## 一、整体架构
 
@@ -30,6 +34,8 @@ utils/store.js  ── wx.cloud.callFunction ──►  云函数 bookkeeping（
 | `date` | string | `YYYY-MM-DD`，所有按年/月/日查询都基于它 |
 | `type` | string | `income` 收入 / `expense` 支出 |
 | `amountCents` | number | 金额，单位「分」的整数，避免浮点误差 |
+| `unitPriceCents` | number | 单价（分），`0` 表示该记录不使用「单价 × 数量」计价 |
+| `quantity` | number | 数量（可为小数），`0` 表示不使用；与单价同时 > 0 时，金额由 `Math.round(unitPriceCents × quantity)` 计算 |
 | `category` | string | 分类 |
 | `note` | string | 备注 |
 | `createdAt` / `updatedAt` | date | 服务端时间（`db.serverDate()`） |
@@ -116,6 +122,8 @@ utils/store.js  ── wx.cloud.callFunction ──►  云函数 bookkeeping（
 ```
 
 ## 五、部署步骤
+
+> 精简版逐项清单（「要改哪两个文件、openid 为什么不用配、报错对照」）见 **[deploy-checklist.md](deploy-checklist.md)**。
 
 ### 1. 开通云开发
 

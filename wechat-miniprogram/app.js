@@ -11,6 +11,15 @@ App({
   },
 
   onLaunch() {
+    // 本地模式：只初始化本地存储，不需要云环境
+    if (store.mode !== 'cloud') {
+      store
+        .init()
+        .catch((err) => console.error('[bookkeeping] 本地数据初始化失败：', err));
+      return;
+    }
+
+    // 云开发模式
     if (!wx.cloud) {
       console.error('当前基础库版本过低，无法使用云开发能力，请升级基础库版本');
       return;

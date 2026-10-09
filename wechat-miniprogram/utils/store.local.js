@@ -1,39 +1,55 @@
+'use strict';
+
 /**
- * 数据层：使用小程序本地存储（wx.setStorageSync / getStorageSync）持久化。
+ * 数据层（本地存储版）
  *
- * 记录结构：
- *   {
- *     id: number,
- *     date: 'YYYY-MM-DD',
- *     type: 'income' | 'expense',
- *     amountCents: number,   // 金额，单位「分」，避免浮点误差
- *     category: string,
- *     note: string,
- *     createdAt: number,
- *     updatedAt: number
- *   }
- *
- * 接口与 Web 版 db.js 一一对应，统计逻辑保持完全一致。
+ * - 数据存在小程序本地存储（wx.setStorageSync），**不依赖云开发**，无需 AppID 与网络
+ * - 数据仅存于当前设备 + 当前微信账号，换设备不同步；清缓存会丢失
+ * - 操作日志同样记录在本地（bk:logs），滚动保留最近 MAX_LOGS 条
+ * - 接口与 store.cloud.js 完全一致（返回结构相同），由 store.js 按 config.mode 选择
+ * - 本文件内的方法为同步实现，对外由 store.js 统一包装成 Promise
  */
 
-const { pad2, parseDate } = require('./format');
+const fmt = require('./format');
 
 const RECORDS_KEY = 'bk:records';
 const CATEGORIES_KEY = 'bk:categories';
 const SEQ_KEY = 'bk:seq';
+const LOGS_KEY = 'bk:logs';
 
 const DEFAULT_CATEGORIES = {
   expense: ['餐饮', '交通', '购物', '居住', '娱乐', '医疗', '教育', '通讯', '人情', '其他'],
   income: ['工资', '奖金', '兼职', '理财', '租金', '红包', '其他'],
 };
 
+/** 本地日志滚动上限：避免日志把本地存储占满 */
+const MAX_LOGS = 500;
+
 let recordCache = null;
+let logCache = null;
 
 /* --------------------------------- 基础读写 -------------------------------- */
 
 function init() {
   listCategories();
   readRecords();
+  readLogs();
+  return { mode: 'local', ready: true };
+}
+
+function initDb() {
+  init();
+  return { mode: 'local', collections: { records: RECORDS_KEY, categories: CATEGORIES_KEY, logs: LOGS_KEY } };
+}
+
+/** 本地模式没有微信用户身份，返回固定的占位信息 */
+function whoami() {
+  return {
+    openid: '',
+    openidMasked: '本地模式（未接入云开发）',
+    appid: '',
+    envId: '本地存储',
+  };
 }
 
 function readRecords() {
@@ -46,6 +62,18 @@ function readRecords() {
 function writeRecords(records) {
   recordCache = records;
   wx.setStorageSync(RECORDS_KEY, records);
+}
+
+function readLogs() {
+  if (logCache) return logCache;
+  const raw = wx.getStorageSync(LOGS_KEY);
+  logCache = Array.isArray(raw) ? raw : [];
+  return logCache;
+}
+
+function writeLogs(logs) {
+  logCache = logs;
+  wx.setStorageSync(LOGS_KEY, logs);
 }
 
 function nextId() {
@@ -68,13 +96,94 @@ function normalizeInput(input) {
   const type = source.type;
   if (type !== 'income' && type !== 'expense') throw new Error('类型只能是收入或支出');
 
-  const amountCents = Number(source.amountCents);
-  if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error('金额必须大于 0');
+  const unitPriceCents = Math.max(0, Math.round(Number(source.unitPriceCents) || 0));
+  const quantity = Math.max(0, Number(source.quantity) || 0);
+  if (quantity > 1e9) throw new Error('数量超出合理范围');
 
-  const category = String(source.category || '').trim() || '其他';
-  const note = String(source.note || '').trim();
+  // 单价 × 数量 计价：两者都大于 0 时金额由它们计算（以分为单位四舍五入 = 保留两位小数）
+  let amountCents;
+  if (unitPriceCents > 0 && quantity > 0) {
+    amountCents = Math.round(unitPriceCents * quantity);
+    if (amountCents <= 0) throw new Error('单价 × 数量 计算出的金额必须大于 0');
+  } else {
+    amountCents = Math.round(Number(source.amountCents));
+    if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error('金额必须大于 0（也可填写单价与数量自动计算）');
+  }
 
-  return { date, type, amountCents, category, note };
+  const category = String(source.category || '').trim().slice(0, 30) || '其他';
+  const note = String(source.note || '').trim().slice(0, 200);
+
+  return { date, type, amountCents, unitPriceCents, quantity, category, note };
+}
+
+const RECORD_FIELDS = ['date', 'type', 'amountCents', 'unitPriceCents', 'quantity', 'category', 'note'];
+
+function pickRecord(doc) {
+  const out = {};
+  RECORD_FIELDS.forEach((key) => {
+    out[key] = doc[key];
+  });
+  return out;
+}
+
+function diffKeys(before, after) {
+  return RECORD_FIELDS.filter((key) => before[key] !== after[key]);
+}
+
+function describe(record) {
+  if (!record) return '';
+  const kind = record.type === 'income' ? '收入' : '支出';
+  return `${record.date} ${kind} ${(record.amountCents / 100).toFixed(2)} 元（${record.category}）`;
+}
+
+/* ---------------------------------- 日志 ---------------------------------- */
+
+let cachedClient = null;
+function clientInfo() {
+  if (cachedClient) return cachedClient;
+  const info = { version: '', platform: '', model: '' };
+  try {
+    const account = wx.getAccountInfoSync();
+    info.version = (account && account.miniProgram && account.miniProgram.version) || '';
+  } catch (err) {
+    // 忽略
+  }
+  try {
+    const device = typeof wx.getDeviceInfo === 'function' ? wx.getDeviceInfo() : wx.getSystemInfoSync();
+    info.platform = device.platform || device.system || '';
+    info.model = device.model || '';
+  } catch (err) {
+    // 忽略
+  }
+  cachedClient = info;
+  return cachedClient;
+}
+
+function buildLog(payload) {
+  return Object.assign(
+    {
+      id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      action: '',
+      target: 'records',
+      recordId: '',
+      before: null,
+      after: null,
+      changed: [],
+      summary: '',
+      batchId: '',
+      count: 0,
+      errors: [],
+      client: clientInfo(),
+      time: Date.now(),
+    },
+    payload
+  );
+}
+
+function appendLogs(entries) {
+  if (!entries || !entries.length) return;
+  const logs = readLogs().concat(entries);
+  writeLogs(logs.length > MAX_LOGS ? logs.slice(logs.length - MAX_LOGS) : logs);
 }
 
 /* --------------------------------- 记录 CRUD ------------------------------- */
@@ -86,34 +195,44 @@ function listRecords(options) {
   let list = readRecords();
 
   if (year) {
-    const prefix = month ? `${year}-${pad2(month)}` : `${year}-`;
+    const prefix = month ? `${year}-${fmt.pad2(month)}` : `${year}-`;
     list = list.filter((item) => item.date.indexOf(prefix) === 0);
   }
   if (day) list = list.filter((item) => item.date === day);
   if (type === 'income' || type === 'expense') list = list.filter((item) => item.type === type);
   if (category) list = list.filter((item) => item.category === category);
-  if (keyword) {
+  if (keyword && String(keyword).trim()) {
     const kw = String(keyword).trim().toLowerCase();
-    if (kw) {
-      list = list.filter((item) => `${item.category}${item.note}`.toLowerCase().indexOf(kw) >= 0);
-    }
+    list = list.filter((item) => `${item.category}${item.note}`.toLowerCase().indexOf(kw) >= 0);
   }
 
-  return list.slice().sort((a, b) => (a.date === b.date ? b.id - a.id : a.date < b.date ? 1 : -1));
+  const sorted = list
+    .slice()
+    .sort((a, b) => (a.date === b.date ? b.id - a.id : a.date < b.date ? 1 : -1));
+
+  const total = sorted.length;
+  const limit = Math.min(Math.max(Number(opt.limit) || 500, 1), 5000);
+  const offset = Math.max(Number(opt.offset) || 0, 0);
+
+  return { total, items: sorted.slice(offset, offset + limit) };
 }
 
 function getRecord(id) {
   const target = Number(id);
-  return readRecords().find((item) => Number(item.id) === target) || null;
+  const hit = readRecords().find((item) => Number(item.id) === target);
+  return hit ? Object.assign({}, hit) : null;
 }
 
 function createRecord(input) {
   const data = normalizeInput(input);
   const now = Date.now();
   const record = Object.assign({ id: nextId() }, data, { createdAt: now, updatedAt: now });
+
   writeRecords(readRecords().concat([record]));
   ensureCategory(data.category, data.type);
-  return record;
+  appendLogs([buildLog({ action: 'create', recordId: String(record.id), after: data, summary: `新增 ${describe(data)}` })]);
+
+  return { id: record.id, record: Object.assign({}, record) };
 }
 
 function updateRecord(id, input) {
@@ -122,63 +241,119 @@ function updateRecord(id, input) {
   const index = records.findIndex((item) => Number(item.id) === target);
   if (index < 0) throw new Error('记录不存在或已被删除');
 
-  const merged = Object.assign({}, records[index], input);
-  const data = normalizeInput(merged);
-  const next = Object.assign({}, records[index], data, { updatedAt: Date.now() });
+  const before = records[index];
+  const merged = normalizeInput(Object.assign({}, pickRecord(before), input || {}));
+  const changed = diffKeys(before, merged);
 
+  if (!changed.length) {
+    return { id: target, record: Object.assign({}, before), changed, unchanged: true };
+  }
+
+  const next = Object.assign({}, before, merged, { updatedAt: Date.now() });
   const list = records.slice();
   list[index] = next;
   writeRecords(list);
-  ensureCategory(data.category, data.type);
-  return next;
+  ensureCategory(merged.category, merged.type);
+  appendLogs([
+    buildLog({
+      action: 'update',
+      recordId: String(target),
+      before: pickRecord(before),
+      after: merged,
+      changed,
+      summary: `修改 ${describe(merged)}（字段：${changed.join('、')}）`,
+    }),
+  ]);
+
+  return { id: target, record: Object.assign({}, next), changed };
 }
 
 function deleteRecord(id) {
   const target = Number(id);
   const records = readRecords();
-  const list = records.filter((item) => Number(item.id) !== target);
-  if (list.length === records.length) throw new Error('记录不存在或已被删除');
-  writeRecords(list);
+  const index = records.findIndex((item) => Number(item.id) === target);
+  if (index < 0) throw new Error('记录不存在或已被删除');
+
+  const before = records[index];
+  writeRecords(records.filter((item) => Number(item.id) !== target));
+  appendLogs([buildLog({ action: 'delete', recordId: String(target), before: pickRecord(before), summary: `删除 ${describe(before)}` })]);
+
   return { id: target };
 }
 
-/** 批量导入：逐条校验，合法的入库，非法的返回错误行 */
-function importRecords(items) {
+function importRecords(items, options) {
   if (!Array.isArray(items)) throw new Error('导入数据格式不正确');
   if (!items.length) throw new Error('没有可导入的数据');
   if (items.length > 5000) throw new Error('单次最多导入 5000 条记录');
 
-  const records = readRecords().slice();
-  const inserted = [];
-  const errors = [];
+  const opt = options || {};
+  const detailLog = opt.detailLog !== false;
   const now = Date.now();
+  const batchId = `batch_${now}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const records = readRecords().slice();
   let seq = Number(wx.getStorageSync(SEQ_KEY)) || 0;
-  const maxId = records.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0);
-  seq = Math.max(seq, maxId);
+  seq = Math.max(seq, records.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0));
+
+  const logs = [];
+  const errors = [];
+  let inserted = 0;
 
   items.forEach((raw, index) => {
     try {
       const data = normalizeInput(raw);
       seq += 1;
-      records.push(Object.assign({ id: seq }, data, { createdAt: now, updatedAt: now }));
-      inserted.push(data);
+      records.push(Object.assign({ id: seq }, data, { createdAt: now, updatedAt: now, importBatch: batchId }));
+      inserted += 1;
       ensureCategory(data.category, data.type);
+      if (detailLog) {
+        logs.push(
+          buildLog({
+            action: 'import',
+            batchId,
+            recordId: String(seq),
+            after: data,
+            summary: `导入新增 ${describe(data)}`,
+          })
+        );
+      }
     } catch (err) {
-      errors.push({ row: index + 1, message: err.message || '数据不合法' });
+      const message = (err && err.message) || '数据不合法';
+      errors.push({ row: index + 1, message });
+      logs.push(
+        buildLog({
+          action: 'importRejected',
+          batchId,
+          summary: `导入第 ${index + 1} 行被拒绝：${message}`,
+          errors: [{ row: index + 1, message }],
+        })
+      );
     }
   });
 
   writeRecords(records);
   wx.setStorageSync(SEQ_KEY, seq);
 
-  return { inserted: inserted.length, skipped: errors.length, errors };
+  logs.push(
+    buildLog({
+      action: 'importBatch',
+      batchId,
+      count: inserted,
+      summary: `批量导入完成：成功 ${inserted} 条，跳过 ${errors.length} 条`,
+      errors: errors.slice(0, 100),
+    })
+  );
+  appendLogs(logs);
+
+  return { inserted, skipped: errors.length, errors: errors.slice(0, 100), batchId };
 }
 
 /* ---------------------------------- 统计 ---------------------------------- */
 
 function periodRecords(year, month) {
   const all = readRecords();
-  const prefix = month ? `${year}-${pad2(month)}` : `${year}-`;
+  if (!year) return all;
+  const prefix = month ? `${year}-${fmt.pad2(month)}` : `${year}-`;
   return all.filter((item) => item.date.indexOf(prefix) === 0);
 }
 
@@ -192,7 +367,6 @@ function summarize(records) {
   return { income, expense, profit: income - expense, count: records.length };
 }
 
-/** 本期 + 全年汇总 */
 function overview(year, month) {
   return {
     period: summarize(periodRecords(year, month)),
@@ -200,7 +374,6 @@ function overview(year, month) {
   };
 }
 
-/** 12 个月统计（含累计利润） */
 function monthlySummary(year) {
   const grouped = {};
   periodRecords(year, null).forEach((item) => {
@@ -214,7 +387,7 @@ function monthlySummary(year) {
   const list = [];
   let cumulative = 0;
   for (let m = 1; m <= 12; m += 1) {
-    const key = pad2(m);
+    const key = fmt.pad2(m);
     const hit = grouped[key] || { income: 0, expense: 0, count: 0 };
     cumulative += hit.income - hit.expense;
     list.push({
@@ -229,7 +402,6 @@ function monthlySummary(year) {
   return list;
 }
 
-/** 每日统计（按日期升序） */
 function dailySummary(year, month) {
   const grouped = {};
   periodRecords(year, month).forEach((item) => {
@@ -243,17 +415,10 @@ function dailySummary(year, month) {
     .sort()
     .map((date) => {
       const hit = grouped[date];
-      return {
-        date: hit.date,
-        income: hit.income,
-        expense: hit.expense,
-        profit: hit.income - hit.expense,
-        count: hit.count,
-      };
+      return Object.assign({}, hit, { profit: hit.income - hit.expense });
     });
 }
 
-/** 分类统计（按金额倒序，含占比） */
 function categorySummary(year, month, type) {
   const kind = type === 'income' ? 'income' : 'expense';
   const grouped = {};
@@ -267,10 +432,9 @@ function categorySummary(year, month, type) {
   const list = Object.keys(grouped).map((key) => grouped[key]);
   const total = list.reduce((sum, item) => sum + item.amount, 0);
   list.sort((a, b) => b.amount - a.amount);
-  return list.map((item) => Object.assign({}, item, { ratio: total ? item.amount / total : 0, total }));
+  return list.map((item) => Object.assign({}, item, { ratio: total ? item.amount / total : 0 }));
 }
 
-/** 已有数据的年份（倒序，至少包含当前年） */
 function years() {
   const set = {};
   readRecords().forEach((item) => {
@@ -280,17 +444,17 @@ function years() {
   return Object.keys(set).sort((a, b) => Number(b) - Number(a));
 }
 
-/* --------------------------------- 分类管理 -------------------------------- */
+/* --------------------------------- 分类字典 -------------------------------- */
 
 function listCategories() {
   const raw = wx.getStorageSync(CATEGORIES_KEY);
   if (raw && Array.isArray(raw.income) && Array.isArray(raw.expense)) return raw;
-  const init = {
+  const init2 = {
     income: DEFAULT_CATEGORIES.income.slice(),
     expense: DEFAULT_CATEGORIES.expense.slice(),
   };
-  wx.setStorageSync(CATEGORIES_KEY, init);
-  return init;
+  wx.setStorageSync(CATEGORIES_KEY, init2);
+  return init2;
 }
 
 function addCategory(name, type) {
@@ -310,60 +474,49 @@ function ensureCategory(name, type) {
   try {
     addCategory(name, type);
   } catch (err) {
-    // 忽略分类记录失败，不影响主流程
+    // 分类记录失败不影响主流程
   }
 }
 
-/* --------------------------------- 导入导出 -------------------------------- */
+/* ---------------------------------- 日志查询 ------------------------------- */
 
-/** 生成的 CSV 文本（可用于导出到剪贴板，Excel 直接粘贴即可拆分） */
-function toCsv(records) {
-  const header = ['日期', '类型', '分类', '金额', '备注'];
-  const lines = [header.join(',')];
-  records.forEach((item) => {
-    const cells = [
-      item.date,
-      item.type === 'income' ? '收入' : '支出',
-      item.category,
-      (item.type === 'income' ? '' : '-') + (item.amountCents / 100).toFixed(2),
-      item.note,
-    ].map((cell) => {
-      const text = String(cell == null ? '' : cell);
-      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-    });
-    lines.push(cells.join(','));
+function listLogs(options) {
+  const opt = options || {};
+  let list = readLogs().slice().sort((a, b) => b.time - a.time);
+  if (opt.filterAction) list = list.filter((item) => item.action === opt.filterAction);
+
+  const total = list.length;
+  const limit = Math.min(Math.max(Number(opt.limit) || 50, 1), 200);
+  const offset = Math.max(Number(opt.offset) || 0, 0);
+
+  return { total, items: list.slice(offset, offset + limit) };
+}
+
+function logStats() {
+  const stats = {};
+  let total = 0;
+  readLogs().forEach((item) => {
+    stats[item.action] = (stats[item.action] || 0) + 1;
+    total += 1;
   });
-  return lines.join('\r\n');
+  return { total, stats, capacity: MAX_LOGS };
 }
 
-/** 简单日期/金额解析，供文本导入使用 */
-function toDateString(value) {
-  if (value == null) return null;
-  const text = String(value).trim();
-  let match = text.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?$/);
-  if (match) return `${match[1]}-${pad2(Number(match[2]))}-${pad2(Number(match[3]))}`;
-  match = text.match(/^(\d{4})(\d{2})(\d{2})$/);
-  if (match) return `${match[1]}-${match[2]}-${match[3]}`;
-  return null;
-}
-
-function toType(value) {
-  const text = String(value == null ? '' : value).trim().toLowerCase();
-  if (['支出', 'expense', 'out', 'e', '花费', '-'].indexOf(text) >= 0) return 'expense';
-  if (['收入', 'income', 'in', 'i', '收', '+'].indexOf(text) >= 0) return 'income';
-  return null;
-}
-
-function toAmountCents(value) {
-  if (value == null) return null;
-  const text = String(value).replace(/[¥￥,，\s]/g, '');
-  const num = Number(text);
-  if (!Number.isFinite(num)) return null;
-  return Math.round(num * 100);
+function clearLogs(days) {
+  const keepDays = Math.min(Math.max(Number(days) || 30, 1), 3650);
+  const before = Date.now() - keepDays * 24 * 60 * 60 * 1000;
+  const logs = readLogs();
+  const kept = logs.filter((item) => item.time >= before);
+  const removed = logs.length - kept.length;
+  writeLogs(kept);
+  appendLogs([buildLog({ action: 'clearLogs', target: 'logs', count: removed, summary: `清理 ${keepDays} 天前的日志，共 ${removed} 条` })]);
+  return { removed, days: keepDays };
 }
 
 module.exports = {
   init,
+  initDb,
+  whoami,
   listRecords,
   getRecord,
   createRecord,
@@ -377,9 +530,11 @@ module.exports = {
   years,
   listCategories,
   addCategory,
-  toCsv,
-  toDateString,
-  toType,
-  toAmountCents,
-  DEFAULT_CATEGORIES,
+  listLogs,
+  logStats,
+  clearLogs,
+  toCsv: fmt.toCsv,
+  toDateString: fmt.toDateString,
+  toType: fmt.toType,
+  toAmountCents: fmt.toAmountCents,
 };

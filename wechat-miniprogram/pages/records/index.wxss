@@ -106,6 +106,18 @@
   margin-left: auto;
 }
 
+.computed-amount {
+  flex: 1;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.rec-unit {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+}
+
 .rec-meta {
   display: flex;
   margin-top: 8rpx;
