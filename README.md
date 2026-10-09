@@ -12,7 +12,7 @@
 - **分类统计**：按支出或收入维度查看各分类金额与占比
 - **CSV 导出**：月度总览、每日明细、流水记录均可导出为 CSV（Excel 可直接打开）
 
-> **微信小程序版**：功能一致的实现位于 [`wechat-miniprogram/`](wechat-miniprogram/README.md)。小程序端使用微信本地存储（非 SQLite）、无服务端、不发起任何网络请求，页面通过 `utils/store.js` 本地函数调用完成读写与统计；数据存储与接口调用方式详见 [wechat-miniprogram/docs/data-and-api.md](wechat-miniprogram/docs/data-and-api.md)，发布上线流程（AppID / 密钥 / 审核）见 [wechat-miniprogram/docs/release.md](wechat-miniprogram/docs/release.md)。
+> **微信小程序版**：功能一致的实现位于 [`wechat-miniprogram/`](wechat-miniprogram/README.md)。小程序端使用**微信云开发数据库**（数据按微信用户 openid 隔离、多端同步）与统一云函数 `bookkeeping`（数据读写、统计聚合、操作日志全部收口在云端），**每笔数据操作都会写入操作日志**便于事后排查。数据存储与接口调用见 [docs/data-and-api.md](wechat-miniprogram/docs/data-and-api.md)，云数据库设计与部署见 [docs/cloud-database.md](wechat-miniprogram/docs/cloud-database.md)，发布上线流程（AppID / 密钥 / 审核）见 [docs/release.md](wechat-miniprogram/docs/release.md)。
 
 ## 运行
 

@@ -15,6 +15,7 @@ Page({
     rows: [],
     total: { amount: '0.00', count: 0, kinds: 0 },
     hasData: false,
+    loading: true,
   },
 
   onShow() {
@@ -22,8 +23,7 @@ Page({
   },
 
   onPullDownRefresh() {
-    this.refresh();
-    wx.stopPullDownRefresh();
+    this.refresh().then(() => wx.stopPullDownRefresh());
   },
 
   onYearChange(e) {
@@ -42,40 +42,48 @@ Page({
     this.refresh();
   },
 
-  refresh() {
+  async refresh() {
     const globalData = getApp().globalData;
-    const years = store.years();
-    let year = globalData.year;
-    if (years.indexOf(year) < 0) year = years[0];
-    globalData.year = year;
+    this.setData({ loading: true });
 
-    const monthIndex = globalData.month ? Number(globalData.month) : 0;
-    const periodLabel = globalData.month ? `${year} 年 ${Number(globalData.month)} 月` : `${year} 年（全年）`;
-    const type = this.data.type;
+    try {
+      const years = await store.years();
+      let year = globalData.year;
+      if (years.indexOf(year) < 0) year = years[0];
+      globalData.year = year;
 
-    const list = store.categorySummary(year, globalData.month, type);
-    const totalCents = list.reduce((sum, item) => sum + item.amount, 0);
-    const totalCount = list.reduce((sum, item) => sum + item.count, 0);
+      const monthIndex = globalData.month ? Number(globalData.month) : 0;
+      const periodLabel = globalData.month ? `${year} 年 ${Number(globalData.month)} 月` : `${year} 年（全年）`;
+      const type = this.data.type;
 
-    this.setData({
-      years,
-      year,
-      yearIndex: Math.max(years.indexOf(year), 0),
-      monthIndex,
-      periodLabel,
-      hasData: list.length > 0,
-      rows: list.map((item) => ({
-        category: item.category,
-        count: item.count,
-        amount: fmt.formatMoney(item.amount),
-        ratioText: fmt.formatPercent(item.amount, totalCents),
-        percent: totalCents ? ((item.amount / totalCents) * 100).toFixed(1) : '0.0',
-      })),
-      total: {
-        amount: fmt.formatMoney(totalCents),
-        count: totalCount,
-        kinds: list.length,
-      },
-    });
+      const list = await store.categorySummary(year, globalData.month, type);
+      const totalCents = list.reduce((sum, item) => sum + item.amount, 0);
+      const totalCount = list.reduce((sum, item) => sum + item.count, 0);
+
+      this.setData({
+        years,
+        year,
+        yearIndex: Math.max(years.indexOf(year), 0),
+        monthIndex,
+        periodLabel,
+        hasData: list.length > 0,
+        loading: false,
+        rows: list.map((item) => ({
+          category: item.category,
+          count: item.count,
+          amount: fmt.formatMoney(item.amount),
+          ratioText: fmt.formatPercent(item.amount, totalCents),
+          percent: totalCents ? ((item.amount / totalCents) * 100).toFixed(1) : '0.0',
+        })),
+        total: {
+          amount: fmt.formatMoney(totalCents),
+          count: totalCount,
+          kinds: list.length,
+        },
+      });
+    } catch (err) {
+      this.setData({ loading: false });
+      wx.showToast({ title: err.message, icon: 'none' });
+    }
   },
 });

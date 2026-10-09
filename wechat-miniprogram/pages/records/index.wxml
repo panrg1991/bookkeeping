@@ -74,7 +74,10 @@
   </view>
 
   <!-- 流水列表 -->
-  <view class="card-title">流水记录 <text class="muted">{{periodLabel}} · {{records.length}} 笔</text></view>
+  <view class="list-head">
+    <text class="card-title">流水记录 <text class="muted">{{periodLabel}} · {{records.length}} 笔</text></text>
+    <text class="link" bindtap="onOpenLogs">操作日志</text>
+  </view>
 
   <view class="segmented">
     <view class="segment {{filterType === 'all' ? 'active' : ''}}" data-value="all" bindtap="onFilterTypeChange">全部</view>

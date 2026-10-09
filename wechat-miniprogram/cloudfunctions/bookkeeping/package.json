@@ -1,0 +1,9 @@
+{
+  "name": "bookkeeping",
+  "version": "1.0.0",
+  "description": "财务记账统计统一业务云函数：按 openid 隔离数据、云端统计聚合、每笔操作写日志",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

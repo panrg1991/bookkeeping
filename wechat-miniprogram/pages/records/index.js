@@ -40,13 +40,7 @@ function parsePastedText(text) {
       return;
     }
 
-    items.push({
-      date,
-      type,
-      amountCents,
-      category: cells[3] || '其他',
-      note: cells[4] || '',
-    });
+    items.push({ date, type, amountCents, category: cells[3] || '其他', note: cells[4] || '' });
   });
 
   return { items, skipped };
@@ -71,31 +65,37 @@ Page({
   },
 
   rawRecords: [],
+  categories: { income: [], expense: [] },
 
   onLoad() {
-    this.setData({ categoryOptions: store.listCategories().expense });
+    this.loadCategories();
   },
 
-  onShow() {
+  async onShow() {
     const globalData = getApp().globalData;
 
     // 从「每日明细」页点「修改」跳转过来：进入编辑态
     if (globalData.editId) {
-      const record = store.getRecord(globalData.editId);
+      const id = globalData.editId;
       globalData.editId = null;
-      if (record) {
-        this.setData({
-          editingId: record.id,
-          form: {
-            date: record.date,
-            type: record.type,
-            amount: fmt.centsToYuanInput(record.amountCents),
-            category: record.category,
-            note: record.note,
-          },
-          categoryOptions: store.listCategories()[record.type],
-        });
-        wx.pageScrollTo({ scrollTop: 0, duration: 0 });
+      try {
+        const record = await store.getRecord(id);
+        if (record) {
+          this.setData({
+            editingId: record.id,
+            form: {
+              date: record.date,
+              type: record.type,
+              amount: fmt.centsToYuanInput(record.amountCents),
+              category: record.category,
+              note: record.note,
+            },
+          });
+          this.syncCategoryOptions(record.type);
+          wx.pageScrollTo({ scrollTop: 0, duration: 0 });
+        }
+      } catch (err) {
+        wx.showToast({ title: err.message, icon: 'none' });
       }
     }
 
@@ -104,8 +104,24 @@ Page({
 
   onPullDownRefresh() {
     this.resetForm();
-    this.refresh();
-    wx.stopPullDownRefresh();
+    this.refresh().then(() => wx.stopPullDownRefresh());
+  },
+
+  /* ------------------------------ 分类字典 ----------------------------- */
+
+  async loadCategories() {
+    try {
+      const categories = await store.listCategories();
+      this.categories = categories;
+      this.syncCategoryOptions(this.data.form.type);
+    } catch (err) {
+      wx.showToast({ title: err.message, icon: 'none' });
+    }
+  },
+
+  syncCategoryOptions(type) {
+    const categories = this.categories || { income: [], expense: [] };
+    this.setData({ categoryOptions: categories[type] || [] });
   },
 
   /* ------------------------------ 筛选条 ------------------------------ */
@@ -139,10 +155,8 @@ Page({
 
   onTypeChange(e) {
     const type = e.currentTarget.dataset.type;
-    this.setData({
-      'form.type': type,
-      categoryOptions: store.listCategories()[type],
-    });
+    this.setData({ 'form.type': type });
+    this.syncCategoryOptions(type);
   },
 
   onAmountInput(e) {
@@ -168,14 +182,12 @@ Page({
 
   /** 完全恢复默认：日期今天、类型支出 */
   resetForm() {
-    this.setData({
-      editingId: null,
-      form: emptyForm(),
-      categoryOptions: store.listCategories().expense,
-    });
+    const form = emptyForm();
+    this.setData({ editingId: null, form });
+    this.syncCategoryOptions(form.type);
   },
 
-  onSubmit() {
+  async onSubmit() {
     const form = this.data.form;
     const amountCents = fmt.yuanToCents(form.amount);
 
@@ -188,20 +200,23 @@ Page({
       return;
     }
 
-    try {
-      const payload = {
-        date: form.date,
-        type: form.type,
-        amountCents,
-        category: form.category,
-        note: form.note,
-      };
+    const payload = {
+      date: form.date,
+      type: form.type,
+      amountCents,
+      category: form.category,
+      note: form.note,
+    };
 
+    wx.showLoading({ title: '保存中', mask: true });
+    try {
       if (this.data.editingId) {
-        store.updateRecord(this.data.editingId, payload);
-        wx.showToast({ title: '已保存修改', icon: 'success' });
+        const res = await store.updateRecord(this.data.editingId, payload);
+        wx.hideLoading();
+        wx.showToast({ title: res && res.unchanged ? '内容未变化' : '已保存修改', icon: 'success' });
       } else {
-        store.createRecord(payload);
+        await store.createRecord(payload);
+        wx.hideLoading();
         wx.showToast({ title: '已保存', icon: 'success' });
       }
 
@@ -212,52 +227,60 @@ Page({
       });
       this.refresh();
     } catch (err) {
+      wx.hideLoading();
       wx.showToast({ title: err.message, icon: 'none' });
     }
   },
 
   /* ------------------------------ 记录列表 ----------------------------- */
 
-  onEdit(e) {
-    const record = store.getRecord(Number(e.currentTarget.dataset.id));
-    if (!record) {
-      wx.showToast({ title: '记录不存在', icon: 'none' });
-      return;
+  async onEdit(e) {
+    const id = String(e.currentTarget.dataset.id);
+    wx.showLoading({ title: '加载中', mask: false });
+    try {
+      const record = await store.getRecord(id);
+      wx.hideLoading();
+      if (!record) {
+        wx.showToast({ title: '记录不存在', icon: 'none' });
+        return;
+      }
+      this.setData({
+        editingId: record.id,
+        form: {
+          date: record.date,
+          type: record.type,
+          amount: fmt.centsToYuanInput(record.amountCents),
+          category: record.category,
+          note: record.note,
+        },
+      });
+      this.syncCategoryOptions(record.type);
+      wx.pageScrollTo({ scrollTop: 0, duration: 150 });
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: err.message, icon: 'none' });
     }
-    this.setData({
-      editingId: record.id,
-      form: {
-        date: record.date,
-        type: record.type,
-        amount: fmt.centsToYuanInput(record.amountCents),
-        category: record.category,
-        note: record.note,
-      },
-      categoryOptions: store.listCategories()[record.type],
-    });
-    wx.pageScrollTo({ scrollTop: 0, duration: 150 });
   },
 
   onDelete(e) {
-    const id = Number(e.currentTarget.dataset.id);
-    const record = store.getRecord(id);
-    const label = record
-      ? `${record.date} ${record.type === 'income' ? '收入' : '支出'} ${fmt.formatMoney(record.amountCents)} 元（${record.category}）`
-      : `记录 #${id}`;
+    const id = String(e.currentTarget.dataset.id);
 
     wx.showModal({
       title: '删除确认',
-      content: `确定删除这条记录吗？删除后不可恢复。\n${label}`,
+      content: '确定删除这条记录吗？删除后不可恢复。',
       confirmText: '删除',
       confirmColor: '#dc2626',
-      success: (res) => {
+      success: async (res) => {
         if (!res.confirm) return;
+        wx.showLoading({ title: '删除中', mask: true });
         try {
-          store.deleteRecord(id);
+          await store.deleteRecord(id);
+          wx.hideLoading();
           if (this.data.editingId === id) this.resetForm();
           wx.showToast({ title: '已删除', icon: 'success' });
           this.refresh();
         } catch (err) {
+          wx.hideLoading();
           wx.showToast({ title: err.message, icon: 'none' });
         }
       },
@@ -284,14 +307,17 @@ Page({
     wx.showModal({
       title: '导入确认',
       content: `解析到 ${items.length} 条有效记录${skipped ? `，${skipped} 行无效将被跳过` : ''}，确认导入？`,
-      success: (res) => {
+      success: async (res) => {
         if (!res.confirm) return;
+        wx.showLoading({ title: '导入中', mask: true });
         try {
-          const result = store.importRecords(items);
+          const result = await store.importRecords(items);
+          wx.hideLoading();
           wx.showToast({ title: `已导入 ${result.inserted} 条`, icon: 'success' });
           this.setData({ showImport: false, importText: '' });
           this.refresh();
         } catch (err) {
+          wx.hideLoading();
           wx.showToast({ title: err.message, icon: 'none' });
         }
       },
@@ -306,42 +332,53 @@ Page({
     wx.setClipboardData({ data: store.toCsv(this.rawRecords) });
   },
 
+  onOpenLogs() {
+    wx.navigateTo({ url: '/pages/logs/index' });
+  },
+
   /* ------------------------------- 数据加载 ---------------------------- */
 
-  refresh() {
+  async refresh() {
     const globalData = getApp().globalData;
-    const years = store.years();
-    let year = globalData.year;
-    if (years.indexOf(year) < 0) year = years[0];
-    globalData.year = year;
 
-    const monthIndex = globalData.month ? Number(globalData.month) : 0;
-    const periodLabel = globalData.month ? `${year} 年 ${Number(globalData.month)} 月` : `${year} 年（全年）`;
+    try {
+      const years = await store.years();
+      let year = globalData.year;
+      if (years.indexOf(year) < 0) year = years[0];
+      globalData.year = year;
 
-    const list = store.listRecords({
-      year,
-      month: globalData.month,
-      type: this.data.filterType,
-      keyword: this.data.keyword,
-    });
-    this.rawRecords = list;
+      const monthIndex = globalData.month ? Number(globalData.month) : 0;
+      const periodLabel = globalData.month ? `${year} 年 ${Number(globalData.month)} 月` : `${year} 年（全年）`;
 
-    this.setData({
-      years,
-      year,
-      yearIndex: Math.max(years.indexOf(year), 0),
-      monthIndex,
-      periodLabel,
-      records: list.map((item) => ({
-        id: item.id,
-        date: item.date,
-        type: item.type,
-        typeLabel: item.type === 'income' ? '收入' : '支出',
-        category: item.category,
-        note: item.note,
-        amount: `${item.type === 'income' ? '+' : '-'}${fmt.formatMoney(item.amountCents)}`,
-        amountCls: item.type === 'income' ? 'income-text' : 'expense-text',
-      })),
-    });
+      const res = await store.listRecords({
+        year,
+        month: globalData.month,
+        type: this.data.filterType,
+        keyword: this.data.keyword,
+        limit: 500,
+      });
+
+      this.rawRecords = res.items;
+
+      this.setData({
+        years,
+        year,
+        yearIndex: Math.max(years.indexOf(year), 0),
+        monthIndex,
+        periodLabel,
+        records: res.items.map((item) => ({
+          id: item.id,
+          date: item.date,
+          type: item.type,
+          typeLabel: item.type === 'income' ? '收入' : '支出',
+          category: item.category,
+          note: item.note,
+          amount: `${item.type === 'income' ? '+' : '-'}${fmt.formatMoney(item.amountCents)}`,
+          amountCls: item.type === 'income' ? 'income-text' : 'expense-text',
+        })),
+      });
+    } catch (err) {
+      wx.showToast({ title: err.message, icon: 'none' });
+    }
   },
 });

@@ -68,6 +68,54 @@ function centsToYuanInput(cents) {
   return String(Number(cents || 0) / 100);
 }
 
+/* ------------------------- 导入 / 导出用的解析与生成 ------------------------- */
+
+/** 记录数组 -> CSV 文本（导出到剪贴板，粘贴进 Excel 即可） */
+function toCsv(records) {
+  const lines = [['日期', '类型', '分类', '金额', '备注'].join(',')];
+  (records || []).forEach((item) => {
+    const cells = [
+      item.date,
+      item.type === 'income' ? '收入' : '支出',
+      item.category,
+      `${item.type === 'income' ? '' : '-'}${(item.amountCents / 100).toFixed(2)}`,
+      item.note,
+    ].map((cell) => {
+      const text = String(cell == null ? '' : cell);
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    });
+    lines.push(cells.join(','));
+  });
+  return lines.join('\r\n');
+}
+
+/** 解析各种日期写法为 YYYY-MM-DD，无法识别时返回 null */
+function toDateString(value) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  let match = text.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?$/);
+  if (match) return `${match[1]}-${pad2(Number(match[2]))}-${pad2(Number(match[3]))}`;
+  match = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+  return null;
+}
+
+/** 解析类型写法为 income / expense，无法识别时返回 null */
+function toType(value) {
+  const text = String(value == null ? '' : value).trim().toLowerCase();
+  if (['支出', 'expense', 'out', 'e', '花费', '-'].indexOf(text) >= 0) return 'expense';
+  if (['收入', 'income', 'in', 'i', '收', '+'].indexOf(text) >= 0) return 'income';
+  return null;
+}
+
+/** 解析金额（元）为分，非法时返回 null */
+function toAmountCents(value) {
+  if (value == null) return null;
+  const num = Number(String(value).replace(/[¥￥,，\s]/g, ''));
+  if (!Number.isFinite(num)) return null;
+  return Math.round(num * 100);
+}
+
 module.exports = {
   WEEKDAYS,
   pad2,
@@ -80,4 +128,8 @@ module.exports = {
   moneyClass,
   yuanToCents,
   centsToYuanInput,
+  toCsv,
+  toDateString,
+  toType,
+  toAmountCents,
 };

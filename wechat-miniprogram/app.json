@@ -3,7 +3,8 @@
     "pages/monthly/index",
     "pages/daily/index",
     "pages/records/index",
-    "pages/category/index"
+    "pages/category/index",
+    "pages/logs/index"
   ],
   "window": {
     "backgroundTextStyle": "light",

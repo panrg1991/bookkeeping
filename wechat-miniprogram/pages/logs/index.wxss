@@ -1,0 +1,77 @@
+.stat-line {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 12rpx;
+}
+
+.stat-item {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 22rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 22rpx;
+  margin: 0 12rpx 12rpx 0;
+}
+
+.log-actions {
+  display: flex;
+  padding-top: 8rpx;
+}
+
+.log-tip {
+  padding-top: 4rpx;
+  line-height: 1.6;
+}
+
+.log-list {
+  padding-bottom: 40rpx;
+}
+
+.log-item {
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 2rpx 12rpx rgba(16, 24, 40, 0.06);
+}
+
+.log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tag.update {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.log-time {
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.log-summary {
+  font-size: 26rpx;
+  margin-top: 12rpx;
+  line-height: 1.5;
+}
+
+.log-detail {
+  font-size: 24rpx;
+  color: #1d4ed8;
+  margin-top: 8rpx;
+  line-height: 1.5;
+}
+
+.log-meta {
+  font-size: 22rpx;
+  margin-top: 8rpx;
+}
+
+.load-more {
+  text-align: center;
+  font-size: 26rpx;
+  color: #2563eb;
+  padding: 20rpx 0;
+}

@@ -19,6 +19,13 @@
   margin-left: 24rpx;
 }
 
+.list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
 .segmented.inline {
   flex: 1;
   margin-bottom: 0;
