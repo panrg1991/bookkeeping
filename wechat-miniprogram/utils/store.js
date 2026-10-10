@@ -26,6 +26,7 @@ const ASYNC_METHODS = [
   'createRecord',
   'updateRecord',
   'deleteRecord',
+  'deleteRecords',
   'importRecords',
   'overview',
   'monthlySummary',

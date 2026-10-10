@@ -128,7 +128,19 @@
   <!-- 流水列表 -->
   <view class="list-head">
     <text class="card-title">流水记录 <text class="muted">{{periodLabel}} · {{records.length}} 笔</text></text>
-    <text class="link" bindtap="onOpenLogs">操作日志</text>
+    <view class="list-head-actions">
+      <text class="link" bindtap="onToggleSelectMode">{{selectMode ? '退出批量' : '批量管理'}}</text>
+      <text class="link" bindtap="onOpenLogs">操作日志</text>
+    </view>
+  </view>
+
+  <!-- 批量选择操作条 -->
+  <view class="select-bar" wx:if="{{selectMode}}">
+    <text class="select-info">已选 {{selectedIds.length}} 条</text>
+    <view class="select-actions">
+      <text class="link" bindtap="onSelectAll">{{allSelected ? '取消全选' : '全选'}}</text>
+      <view class="btn danger {{selectedIds.length ? '' : 'disabled'}}" bindtap="onBatchDelete">删除选中</view>
+    </view>
   </view>
 
   <view class="segmented">
@@ -144,22 +156,34 @@
   </view>
 
   <view class="rec-list" wx:else>
-    <view class="rec-card" wx:for="{{records}}" wx:key="id">
-      <view class="rec-line">
-        <text class="tag {{item.type}}">{{item.typeLabel}}</text>
-        <text class="rec-cat">{{item.category}}</text>
-        <text class="rec-amount {{item.amountCls}}">{{item.amount}}</text>
+    <view
+      class="rec-card {{item.checked ? 'is-checked' : ''}}"
+      wx:for="{{records}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="onCardTap"
+    >
+      <view class="rec-check" wx:if="{{selectMode}}">
+        <view class="checkbox {{item.checked ? 'on' : ''}}">{{item.checked ? '✓' : ''}}</view>
       </view>
-      <view class="rec-unit" wx:if="{{item.unitPriceText}}">
-        <text class="muted">{{item.unitPriceText}}（单价 × 数量）</text>
-      </view>
-      <view class="rec-meta">
-        <text class="muted">{{item.date}}</text>
-        <text class="muted rec-note" wx:if="{{item.note}}">· {{item.note}}</text>
-      </view>
-      <view class="rec-actions">
-        <text class="mini-btn" data-id="{{item.id}}" bindtap="onEdit">修改</text>
-        <text class="mini-btn danger" data-id="{{item.id}}" bindtap="onDelete">删除</text>
+
+      <view class="rec-main">
+        <view class="rec-line">
+          <text class="tag {{item.type}}">{{item.typeLabel}}</text>
+          <text class="rec-cat">{{item.category}}</text>
+          <text class="rec-amount {{item.amountCls}}">{{item.amount}}</text>
+        </view>
+        <view class="rec-unit" wx:if="{{item.unitPriceText}}">
+          <text class="muted">{{item.unitPriceText}}（单价 × 数量）</text>
+        </view>
+        <view class="rec-meta">
+          <text class="muted">{{item.date}}</text>
+          <text class="muted rec-note" wx:if="{{item.note}}">· {{item.note}}</text>
+        </view>
+        <view class="rec-actions" wx:if="{{!selectMode}}">
+          <text class="mini-btn" data-id="{{item.id}}" catchtap="onEdit">修改</text>
+          <text class="mini-btn danger" data-id="{{item.id}}" catchtap="onDelete">删除</text>
+        </view>
       </view>
     </view>
   </view>

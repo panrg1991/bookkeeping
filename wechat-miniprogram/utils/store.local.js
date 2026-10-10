@@ -229,7 +229,6 @@ function createRecord(input) {
   const record = Object.assign({ id: nextId() }, data, { createdAt: now, updatedAt: now });
 
   writeRecords(readRecords().concat([record]));
-  ensureCategory(data.category, data.type);
   appendLogs([buildLog({ action: 'create', recordId: String(record.id), after: data, summary: `新增 ${describe(data)}` })]);
 
   return { id: record.id, record: Object.assign({}, record) };
@@ -253,7 +252,6 @@ function updateRecord(id, input) {
   const list = records.slice();
   list[index] = next;
   writeRecords(list);
-  ensureCategory(merged.category, merged.type);
   appendLogs([
     buildLog({
       action: 'update',
@@ -281,6 +279,38 @@ function deleteRecord(id) {
   return { id: target };
 }
 
+/** 批量删除：一次写入，逐条记录删除日志 */
+function deleteRecords(ids) {
+  const wanted = (Array.isArray(ids) ? ids : []).map(String).filter(Boolean);
+  if (!wanted.length) throw new Error('没有选择要删除的记录');
+
+  const records = readRecords();
+  const keep = [];
+  const logs = [];
+  let removed = 0;
+
+  records.forEach((item) => {
+    if (wanted.indexOf(String(item.id)) >= 0) {
+      removed += 1;
+      logs.push(
+        buildLog({
+          action: 'delete',
+          recordId: String(item.id),
+          before: pickRecord(item),
+          summary: `批量删除 ${describe(item)}`,
+        })
+      );
+    } else {
+      keep.push(item);
+    }
+  });
+
+  writeRecords(keep);
+  appendLogs(logs);
+
+  return { removed, skipped: wanted.length - removed };
+}
+
 function importRecords(items, options) {
   if (!Array.isArray(items)) throw new Error('导入数据格式不正确');
   if (!items.length) throw new Error('没有可导入的数据');
@@ -305,7 +335,6 @@ function importRecords(items, options) {
       seq += 1;
       records.push(Object.assign({ id: seq }, data, { createdAt: now, updatedAt: now, importBatch: batchId }));
       inserted += 1;
-      ensureCategory(data.category, data.type);
       if (detailLog) {
         logs.push(
           buildLog({
@@ -446,7 +475,8 @@ function years() {
 
 /* --------------------------------- 分类字典 -------------------------------- */
 
-function listCategories() {
+/** 原始分类字典（仅默认种子 + 显式添加，不含记录中使用过的分类） */
+function readStoredCategories() {
   const raw = wx.getStorageSync(CATEGORIES_KEY);
   if (raw && Array.isArray(raw.income) && Array.isArray(raw.expense)) return raw;
   const init2 = {
@@ -457,25 +487,40 @@ function listCategories() {
   return init2;
 }
 
+/**
+ * 分类字典 = 默认分类 + 字典（默认种子 + 显式添加）+ 记录中实际使用过的分类
+ *
+ * 说明：保存记录时**不再**自动把新分类写进字典（旧实现会，导致录错一次就长期留在
+ * 下拉框里）。现在分类还有记录在用时才会出现，把记录改成别的分类后它会自动消失。
+ */
+function listCategories() {
+  const base = readStoredCategories();
+  const records = readRecords();
+
+  const build = (kind) => {
+    const out = (DEFAULT_CATEGORIES[kind] || []).slice();
+    const push = (name) => {
+      const clean = String(name || '').trim();
+      if (clean && out.indexOf(clean) < 0) out.push(clean);
+    };
+    (base[kind] || []).forEach(push);
+    records.filter((item) => item.type === kind).forEach((item) => push(item.category));
+    return out;
+  };
+
+  return { income: build('income'), expense: build('expense') };
+}
+
 function addCategory(name, type) {
   const clean = String(name || '').trim();
   if (!clean) throw new Error('分类名称不能为空');
   const kind = type === 'income' ? 'income' : 'expense';
-  const categories = listCategories();
-  if (categories[kind].indexOf(clean) < 0) {
-    categories[kind].push(clean);
-    wx.setStorageSync(CATEGORIES_KEY, categories);
+  const stored = readStoredCategories();
+  if (stored[kind].indexOf(clean) < 0) {
+    stored[kind].push(clean);
+    wx.setStorageSync(CATEGORIES_KEY, stored);
   }
-  return categories;
-}
-
-function ensureCategory(name, type) {
-  if (!name) return;
-  try {
-    addCategory(name, type);
-  } catch (err) {
-    // 分类记录失败不影响主流程
-  }
+  return listCategories();
 }
 
 /* ---------------------------------- 日志查询 ------------------------------- */
@@ -625,6 +670,7 @@ module.exports = {
   createRecord,
   updateRecord,
   deleteRecord,
+  deleteRecords,
   importRecords,
   overview,
   monthlySummary,

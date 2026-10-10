@@ -65,7 +65,7 @@ utils/store.js  ── wx.cloud.callFunction ──►  云函数 bookkeeping（
 | --- | --- |
 | `create` | 新增记录 |
 | `update` | 修改记录（含 `before`/`after`/`changed`） |
-| `delete` | 删除记录（含被删内容 `before`） |
+| `delete` | 删除记录（含被删内容 `before`）；批量删除时逐条记录，单次上限 200 条 |
 | `import` | 批量导入中的单条新增 |
 | `importBatch` | 一次导入的汇总（成功数、失败数、失败行） |
 | `importRejected` | 导入时被校验拒绝的行 |

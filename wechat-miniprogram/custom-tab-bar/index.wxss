@@ -1,0 +1,45 @@
+/* 底部导航：与内容区用边框隔开，各导航项之间也用竖线分隔 */
+.tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  background: #ffffff;
+  border-top: 2rpx solid #d8dfea;
+  box-shadow: 0 -2rpx 12rpx rgba(16, 24, 40, 0.06);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+}
+
+.tab-item {
+  position: relative;
+  flex: 1;
+  text-align: center;
+  padding: 22rpx 0;
+  font-size: 26rpx;
+  color: #6b7280;
+}
+
+/* 导航项之间的竖线分隔 */
+.tab-item + .tab-item {
+  border-left: 2rpx solid #eef1f6;
+}
+
+.tab-item.active {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* 选中项顶部指示条 */
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56rpx;
+  height: 4rpx;
+  background: #2563eb;
+  border-radius: 0 0 4rpx 4rpx;
+}

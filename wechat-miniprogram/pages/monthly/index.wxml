@@ -18,23 +18,6 @@
     </view>
   </view>
 
-  <view class="card">
-    <view class="card-title">月度收支趋势（元）</view>
-    <view class="legend">
-      <view class="legend-item"><text class="dot income"></text>收入</view>
-      <view class="legend-item"><text class="dot expense"></text>支出</view>
-    </view>
-    <view class="chart-bars">
-      <view class="chart-group" wx:for="{{bars}}" wx:key="month">
-        <view class="chart-cols">
-          <view class="chart-bar income" style="height:{{item.incomeH}}rpx"></view>
-          <view class="chart-bar expense" style="height:{{item.expenseH}}rpx"></view>
-        </view>
-        <text class="chart-label">{{item.label}}</text>
-      </view>
-    </view>
-  </view>
-
   <view class="card-title">{{year}} 年各月明细</view>
   <scroll-view scroll-x class="table-scroll">
     <view class="table fixed">

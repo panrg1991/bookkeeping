@@ -19,6 +19,10 @@ Page({
   },
 
   onShow() {
+    // 同步自定义 tabBar 的选中项
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 3 });
+    }
     this.refresh();
   },
 

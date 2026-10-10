@@ -71,6 +71,10 @@
 
 每个用户一条：`{ _openid, income: [...], expense: [...], createdAt, updatedAt }`。
 
+> 下拉框里显示的分类 = **默认分类 ∪ 本表 ∪ 记录中实际使用过的分类**。
+> 保存记录时**不再**自动往本表写新分类（旧实现会这么做，导致录错一次就长期留在下拉框里）；
+> 把记录的分类改掉或删除记录后，该分类会自动从下拉框消失。
+
 ## 三、数据层 API（`utils/store.js`）
 
 所有方法都返回 Promise（云函数调用是异步的），与云函数 action 一一对应：
@@ -85,6 +89,7 @@
 | `createRecord(input)` | `createRecord` | 新增（写 `create` 日志） |
 | `updateRecord(id, input)` | `updateRecord` | 修改（写 `update` 日志，含前后值）；内容无变化时返回 `unchanged: true` |
 | `deleteRecord(id)` | `deleteRecord` | 删除（写 `delete` 日志，含被删内容） |
+| `deleteRecords(ids)` | `deleteRecords` | 批量删除（逐条校验归属并写 `delete` 日志），返回 `{ removed, skipped }` |
 | `importRecords(items, options)` | `importRecords` | 批量导入（逐条 + 汇总日志），返回 `{ inserted, skipped, errors, batchId }` |
 | `overview(year, month)` | `overview` | 本期 + 全年汇总（云端聚合） |
 | `monthlySummary(year)` | `monthlySummary` | 12 个月的收入、支出、利润、累计利润、笔数 |
@@ -125,7 +130,7 @@
 点击保存
   → store.createRecord(payload)
     → wx.cloud.callFunction({ name:'bookkeeping', data:{ action:'createRecord', record, client } })
-      → 云函数：校验 → 写入 records（带 _openid）→ 更新分类字典 → 写入 logs（action=create）
+      → 云函数：校验 → 写入 records（带 _openid）→ 写入 logs（action=create）
         → 返回 { ok:true, data:{ id, record } }
           → 页面 toast + 重新 listRecords 刷新列表
 ```

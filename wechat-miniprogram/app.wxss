@@ -5,8 +5,9 @@ page {
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
+/* 底部留出空间：tabBar 改为自定义组件（fixed 定位，覆盖在页面上） */
 .page {
-  padding: 20rpx 24rpx 60rpx;
+  padding: 20rpx 24rpx 180rpx;
 }
 
 /* ---------------- 卡片 ---------------- */
@@ -239,83 +240,6 @@ page {
   text-align: center;
   color: #9ca3af;
   font-size: 26rpx;
-}
-
-/* ---------------- 图表 ---------------- */
-.chart {
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: 24rpx 12rpx 12rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 12rpx rgba(16, 24, 40, 0.06);
-}
-
-.chart-bars {
-  display: flex;
-  align-items: flex-end;
-  height: 240rpx;
-}
-
-.chart-group {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-  justify-content: flex-end;
-}
-
-.chart-cols {
-  display: flex;
-  align-items: flex-end;
-  height: 190rpx;
-}
-
-.chart-bar {
-  width: 12rpx;
-  border-radius: 4rpx 4rpx 0 0;
-  margin: 0 3rpx;
-}
-
-.chart-bar.income {
-  background: #16a34a;
-}
-
-.chart-bar.expense {
-  background: #dc2626;
-}
-
-.chart-label {
-  font-size: 20rpx;
-  color: #9ca3af;
-  margin-top: 10rpx;
-}
-
-.legend {
-  display: flex;
-  font-size: 22rpx;
-  color: #6b7280;
-  margin-bottom: 12rpx;
-}
-
-.legend-item {
-  margin-right: 28rpx;
-}
-
-.dot {
-  display: inline-block;
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 4rpx;
-  margin-right: 8rpx;
-}
-
-.dot.income {
-  background: #16a34a;
-}
-
-.dot.expense {
-  background: #dc2626;
 }
 
 /* ---------------- 表单 ---------------- */

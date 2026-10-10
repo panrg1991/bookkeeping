@@ -12,7 +12,6 @@ Page({
     monthIndex: 0,
     periodLabel: '',
     cards: [],
-    bars: [],
     rows: [],
     total: {},
     hasData: false,
@@ -20,6 +19,10 @@ Page({
   },
 
   onShow() {
+    // 同步自定义 tabBar 的选中项
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 0 });
+    }
     this.refresh();
   },
 
@@ -83,14 +86,6 @@ Page({
         },
       ];
 
-      const max = summary.reduce((acc, item) => Math.max(acc, item.income, item.expense), 0) || 1;
-      const bars = summary.map((item) => ({
-        month: item.month,
-        label: String(Number(item.month)),
-        incomeH: Math.round((item.income / max) * 190),
-        expenseH: Math.round((item.expense / max) * 190),
-      }));
-
       const rows = summary.map((item) => ({
         month: item.month,
         label: `${year}-${item.month}`,
@@ -121,7 +116,6 @@ Page({
         monthIndex,
         periodLabel,
         cards,
-        bars,
         rows,
         total: {
           income: fmt.formatMoney(sum.income),

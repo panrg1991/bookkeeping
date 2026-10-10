@@ -109,6 +109,10 @@ module.exports = {
     return call('importRecords', Object.assign({ items }, options || {}));
   },
 
+  deleteRecords(ids) {
+    return call('deleteRecords', { ids });
+  },
+
   /* -------------------------------- 统计 -------------------------------- */
 
   overview(year, month) {

@@ -321,8 +321,6 @@ async function createRecord(event, ctx) {
     ),
   });
 
-  await ensureCategory(ctx.openid, data.category, data.type);
-
   const logError = await writeLogs([
     buildLog(ctx, event, {
       action: 'create',
@@ -353,7 +351,6 @@ async function updateRecord(event, ctx) {
   });
 
   await db.collection(COLLECTIONS.records).doc(id).update({ data: patch });
-  await ensureCategory(ctx.openid, merged.category, merged.type);
 
   const logError = await writeLogs([
     buildLog(ctx, event, {
@@ -386,6 +383,38 @@ async function deleteRecord(event, ctx) {
   ]);
 
   return { id, logError };
+}
+
+/** 批量删除：逐条校验归属后删除，每条都写 delete 日志 */
+async function deleteRecords(event, ctx) {
+  const ids = (Array.isArray(event.ids) ? event.ids : []).map(String).filter(Boolean);
+  if (!ids.length) throw new Error('没有选择要删除的记录');
+  if (ids.length > 200) throw new Error('单次最多删除 200 条记录');
+
+  const logs = [];
+  const errors = [];
+  let removed = 0;
+
+  for (const id of ids) {
+    try {
+      const before = await getOwnedRecord(id, ctx.openid);
+      await db.collection(COLLECTIONS.records).doc(id).remove();
+      removed += 1;
+      logs.push(
+        buildLog(ctx, event, {
+          action: 'delete',
+          recordId: id,
+          before: pickRecord(before),
+          summary: `批量删除 ${describe(before)}`,
+        })
+      );
+    } catch (err) {
+      errors.push({ row: 0, message: (err && err.message) || '删除失败' });
+    }
+  }
+
+  const logError = await writeLogs(logs);
+  return { removed, skipped: ids.length - removed, errors: errors.slice(0, 50), logError };
 }
 
 async function importRecords(event, ctx) {
@@ -454,14 +483,6 @@ async function importRecords(event, ctx) {
         );
       });
     }
-  }
-
-  const unique = {};
-  valid.forEach((item) => {
-    unique[`${item.type}|${item.category}`] = item;
-  });
-  for (const key of Object.keys(unique)) {
-    await ensureCategory(ctx.openid, unique[key].category, unique[key].type);
   }
 
   logs.push(
@@ -633,9 +654,36 @@ async function years(event, ctx) {
 
 /* ================================ 分类 & 日志 ============================== */
 
+/**
+ * 分类字典 = 默认分类 + 字典（默认种子 + 显式添加）+ 记录中实际使用过的分类
+ *
+ * 说明：保存记录时**不再**自动把新分类写进字典（旧实现会这么做，导致录错一次就
+ * 长期留在下拉框里）。现在分类还有记录在用时才会出现，把记录改成别的分类后自动消失。
+ */
 async function getCategories(event, ctx) {
   const settings = await getSettings(ctx.openid);
-  return { income: settings.income || [], expense: settings.expense || [] };
+
+  const res = await db
+    .collection(COLLECTIONS.records)
+    .aggregate()
+    .match({ _openid: ctx.openid })
+    .group({ _id: { type: '$type', category: '$category' } })
+    .end();
+
+  const build = (kind) => {
+    const out = (DEFAULT_CATEGORIES[kind] || []).slice();
+    const push = (name) => {
+      const clean = String(name || '').trim();
+      if (clean && out.indexOf(clean) < 0) out.push(clean);
+    };
+    (settings[kind] || []).forEach(push);
+    (res.list || []).forEach((row) => {
+      if (row._id && row._id.type === kind) push(row._id.category);
+    });
+    return out;
+  };
+
+  return { income: build('income'), expense: build('expense') };
 }
 
 async function addCategory(event, ctx) {
@@ -755,6 +803,7 @@ const ACTIONS = {
   createRecord,
   updateRecord,
   deleteRecord,
+  deleteRecords,
   importRecords,
   overview,
   monthlySummary,

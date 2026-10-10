@@ -257,7 +257,6 @@ function getRecord(id) {
 
 function createRecord(payload) {
   const data = parseRecordInput(payload);
-  ensureCategory(data.category, data.type);
   const info = db
     .prepare(
       `INSERT INTO records (date, type, amount_cents, unit_price_cents, quantity, category, note)
@@ -288,7 +287,6 @@ function updateRecord(id, payload) {
   if (merged.amount_cents <= 0) throw httpError(400, '金额必须大于 0');
 
   const fields = ['date', 'type', 'amount_cents', 'unit_price_cents', 'quantity', 'category', 'note'];
-  ensureCategory(merged.category, merged.type);
   db.prepare(
     `UPDATE records SET ${fields.map((key) => `${key} = ?`).join(', ')}, updated_at = datetime('now', 'localtime') WHERE id = ?`
   ).run(...fields.map((key) => merged[key]), recordId);
@@ -321,7 +319,6 @@ function importRecords(records) {
       const rowNo = index + 1;
       try {
         const data = parseRecordInput(raw);
-        ensureCategory(data.category, data.type);
         const info = insert.run(
           data.date,
           data.type,
@@ -458,17 +455,29 @@ function years() {
 
 /* --------------------------------- 分类管理 -------------------------------- */
 
-function ensureCategory(name, type) {
-  if (!name) return;
-  insertCategory.run(String(name).trim(), type);
-}
-
+/**
+ * 分类字典 = 默认分类 + 字典表（默认种子 + 显式添加）+ 记录中实际使用过的分类
+ *
+ * 说明：保存记录时**不再**自动把新分类写进字典表（旧实现会这么做，导致录错一次就
+ * 永久留在下拉框里）。现在只要某分类还有记录在用它就会出现在下拉框里；把记录改成
+ * 别的分类后，它会自动从下拉框消失。
+ */
 function listCategories() {
-  const rows = db.prepare('SELECT name, type FROM categories ORDER BY type, id').all();
-  return {
-    income: rows.filter((r) => r.type === 'income').map((r) => r.name),
-    expense: rows.filter((r) => r.type === 'expense').map((r) => r.name),
+  const stored = db.prepare('SELECT name, type FROM categories ORDER BY type, id').all();
+  const used = db.prepare('SELECT DISTINCT type, category FROM records').all();
+
+  const build = (kind) => {
+    const out = (DEFAULT_CATEGORIES[kind] || []).slice();
+    const push = (name) => {
+      const clean = String(name || '').trim();
+      if (clean && out.indexOf(clean) < 0) out.push(clean);
+    };
+    stored.filter((r) => r.type === kind).forEach((r) => push(r.name));
+    used.filter((r) => r.type === kind).forEach((r) => push(r.category));
+    return out;
   };
+
+  return { income: build('income'), expense: build('expense') };
 }
 
 function addCategory(name, type) {

@@ -93,6 +93,10 @@ Page({
     importText: '',
     showBackup: false,
     restoreText: '',
+    // 批量选择
+    selectMode: false,
+    selectedIds: [],
+    allSelected: false,
   },
 
   rawRecords: [],
@@ -103,6 +107,11 @@ Page({
   },
 
   async onShow() {
+    // 同步自定义 tabBar 的选中项
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 2 });
+    }
+
     const globalData = getApp().globalData;
 
     // 从「每日明细」页点「修改」跳转过来：进入编辑态
@@ -377,6 +386,90 @@ Page({
     });
   },
 
+  /* ------------------------------ 批量选择 ----------------------------- */
+
+  onToggleSelectMode() {
+    if (this.data.selectMode) {
+      this.exitSelectMode();
+      return;
+    }
+    this.setData({ selectMode: true, selectedIds: [], allSelected: false });
+    wx.showToast({ title: '点击记录即可多选', icon: 'none' });
+  },
+
+  /** 选择模式下点击整张卡片切换选中；非选择模式不响应 */
+  onCardTap(e) {
+    if (!this.data.selectMode) return;
+    this.toggleSelect(e.currentTarget.dataset.id);
+  },
+
+  toggleSelect(id) {
+    const key = String(id);
+    const selected = this.data.selectedIds.slice();
+    const index = selected.indexOf(key);
+    if (index >= 0) selected.splice(index, 1);
+    else selected.push(key);
+    this.setSelected(selected);
+  },
+
+  setSelected(selectedIds) {
+    const records = this.data.records.map((item) =>
+      Object.assign({}, item, { checked: selectedIds.indexOf(String(item.id)) >= 0 })
+    );
+    this.setData({
+      selectedIds,
+      records,
+      allSelected: records.length > 0 && selectedIds.length >= records.length,
+    });
+  },
+
+  onSelectAll() {
+    if (this.data.allSelected) {
+      this.setSelected([]);
+      return;
+    }
+    this.setSelected(this.data.records.map((item) => String(item.id)));
+  },
+
+  onBatchDelete() {
+    const ids = this.data.selectedIds.slice();
+    if (!ids.length) {
+      wx.showToast({ title: '请先选择要删除的记录', icon: 'none' });
+      return;
+    }
+
+    wx.showModal({
+      title: '批量删除',
+      content: `确定删除选中的 ${ids.length} 条记录吗？删除后不可恢复。`,
+      confirmText: '删除',
+      confirmColor: '#dc2626',
+      success: async (res) => {
+        if (!res.confirm) return;
+        wx.showLoading({ title: '删除中', mask: true });
+        try {
+          const result = await store.deleteRecords(ids);
+          wx.hideLoading();
+          wx.showToast({ title: `已删除 ${result.removed} 条`, icon: 'success' });
+          if (this.data.editingId && ids.indexOf(String(this.data.editingId)) >= 0) this.resetForm();
+          this.exitSelectMode();
+          this.refresh();
+        } catch (err) {
+          wx.hideLoading();
+          wx.showToast({ title: err.message, icon: 'none' });
+        }
+      },
+    });
+  },
+
+  exitSelectMode() {
+    this.setData({
+      selectMode: false,
+      selectedIds: [],
+      allSelected: false,
+      records: this.data.records.map((item) => Object.assign({}, item, { checked: false })),
+    });
+  },
+
   /* ------------------------------ 导入导出 ----------------------------- */
 
   onToggleImport() {
@@ -524,23 +617,35 @@ Page({
 
       this.rawRecords = res.items;
 
+      const items = res.items.map((item) => ({
+        id: item.id,
+        date: item.date,
+        type: item.type,
+        typeLabel: item.type === 'income' ? '收入' : '支出',
+        category: item.category,
+        note: item.note,
+        amount: `${item.type === 'income' ? '+' : '-'}${fmt.formatMoney(item.amountCents)}`,
+        amountCls: item.type === 'income' ? 'income-text' : 'expense-text',
+        unitPriceText: unitPriceText(item),
+      }));
+
+      // 让批量选中状态与最新列表保持一致（已删除或被筛掉的会自动移除）
+      const validIds = items.map((item) => String(item.id));
+      const selectedIds = this.data.selectMode
+        ? this.data.selectedIds.filter((id) => validIds.indexOf(id) >= 0)
+        : [];
+
       this.setData({
         years,
         year,
         yearIndex: Math.max(years.indexOf(year), 0),
         monthIndex,
         periodLabel,
-        records: res.items.map((item) => ({
-          id: item.id,
-          date: item.date,
-          type: item.type,
-          typeLabel: item.type === 'income' ? '收入' : '支出',
-          category: item.category,
-          note: item.note,
-          amount: `${item.type === 'income' ? '+' : '-'}${fmt.formatMoney(item.amountCents)}`,
-          amountCls: item.type === 'income' ? 'income-text' : 'expense-text',
-          unitPriceText: unitPriceText(item),
-        })),
+        selectedIds,
+        allSelected: items.length > 0 && selectedIds.length >= items.length,
+        records: items.map((item) =>
+          Object.assign({}, item, { checked: selectedIds.indexOf(String(item.id)) >= 0 })
+        ),
       });
     } catch (err) {
       wx.showToast({ title: err.message, icon: 'none' });

@@ -1,3 +1,8 @@
+/* 操作日志页不是 tabBar 页面，不需要为底部导航留空间 */
+.page {
+  padding-bottom: 60rpx;
+}
+
 .account-line {
   display: flex;
   align-items: center;
