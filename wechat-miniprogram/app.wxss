@@ -119,11 +119,6 @@ page {
   color: #ffffff;
 }
 
-.btn.block {
-  display: block;
-  margin-right: 0;
-}
-
 .btn.disabled {
   opacity: 0.5;
 }
@@ -139,9 +134,10 @@ page {
 .tr {
   display: flex;
   align-items: center;
-  padding: 18rpx 20rpx;
+  padding: 12rpx 16rpx;
   border-bottom: 2rpx solid #f1f5f9;
   font-size: 26rpx;
+  line-height: 1.4;
 }
 
 .tr.head {
@@ -168,17 +164,14 @@ page {
   text-align: left;
 }
 
-.td.wide {
-  flex: 1.4;
-}
-
 /* ---------------- 颜色 ---------------- */
+/* 颜色约定（小程序）：收入 = 红，支出 = 绿；调整时请同步修改下方 .tag 部分 */
 .income-text {
-  color: #16a34a;
+  color: #dc2626;
 }
 
 .expense-text {
-  color: #dc2626;
+  color: #16a34a;
 }
 
 .profit-text {
@@ -201,12 +194,12 @@ page {
   border-radius: 20rpx;
 }
 
-.tag.expense {
+.tag.income {
   background: #fee2e2;
   color: #b91c1c;
 }
 
-.tag.income {
+.tag.expense {
   background: #dcfce7;
   color: #15803d;
 }
@@ -264,10 +257,6 @@ page {
 .field-picker {
   flex: 1;
   font-size: 28rpx;
-}
-
-.placeholder {
-  color: #9ca3af;
 }
 
 .quick-tags {

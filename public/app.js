@@ -56,10 +56,11 @@ async function api(pathname, params = {}, options = {}) {
 const state = {
   year: String(new Date().getFullYear()),
   month: String(new Date().getMonth() + 1),
-  tab: 'month',
   editingId: null,
   // 计价方式：'amount' 直接填金额 / 'unit' 单价 × 数量 自动计算
   calcMode: 'amount',
+  // 正在设置预警额度的月份（YYYY-MM）
+  budgetMonth: '',
   categoryType: 'expense',
   recordFilter: { type: 'all', keyword: '' },
   expandedDay: null,
@@ -156,11 +157,21 @@ function renderMonth() {
   const body = rows
     .map((r) => {
       const rate = r.income ? ((r.profit / r.income) * 100).toFixed(1) : '0.0';
-      const active = Number(r.month) === Number(state.month) ? ' style="background:#eff6ff"' : '';
-      return `<tr${active}>
-        <td>${state.year}-${r.month}</td>
+      const monthKey = `${state.year}-${r.month}`;
+
+      // 预警额度只显示数字；未设置的月份自动沿用最近一次设置的额度
+      const budgetText = r.budget > 0 ? fmt(r.budget) : '点击设置';
+
+      const rowCls = [
+        Number(r.month) === Number(state.month) ? 'active' : '',
+        r.alert === 'over' ? 'alert-over' : (r.alert === 'near' ? 'alert-near' : ''),
+      ].filter(Boolean).join(' ');
+
+      return `<tr${rowCls ? ` class="${rowCls}"` : ''}>
+        <td>${monthKey}</td>
         <td class="num income-text">${fmt(r.income)}</td>
         <td class="num expense-text">${fmt(r.expense)}</td>
+        <td class="num budget-cell${r.budget > 0 ? '' : ' empty'}" data-action="set-budget" data-month="${monthKey}" title="点击设置该月支出预警额度">${budgetText}</td>
         <td class="num ${moneyClass(r.profit)}">${fmtSigned(r.profit)}</td>
         <td class="num ${moneyClass(r.cumulative)}">${fmtSigned(r.cumulative)}</td>
         <td class="num">${r.count}</td>
@@ -171,14 +182,15 @@ function renderMonth() {
 
   $('#monthTable').innerHTML = `
     <thead><tr>
-      <th>月份</th><th class="num">收入</th><th class="num">支出</th>
+      <th>月份</th><th class="num">收入</th><th class="num">支出</th><th class="num">预警额度</th>
       <th class="num">利润</th><th class="num">累计利润</th><th class="num">笔数</th><th class="num">利润率</th>
     </tr></thead>
-    <tbody>${body || `<tr><td colspan="7" class="empty">${state.year} 年暂无数据</td></tr>`}</tbody>
+    <tbody>${body || `<tr><td colspan="8" class="empty">${state.year} 年暂无数据</td></tr>`}</tbody>
     <tfoot><tr>
       <td>合计</td>
       <td class="num income-text">${fmt(total.income)}</td>
       <td class="num expense-text">${fmt(total.expense)}</td>
+      <td class="num">-</td>
       <td class="num ${moneyClass(total.income - total.expense)}">${fmtSigned(total.income - total.expense)}</td>
       <td class="num">-</td>
       <td class="num">${total.count}</td>
@@ -267,7 +279,7 @@ function renderRecords() {
         <td><span class="tag ${r.type}">${r.type === 'income' ? '收入' : '支出'}</span></td>
         <td>${escapeHtml(r.category)}</td>
         <td class="num ${r.type === 'income' ? 'income-text' : 'expense-text'}">${r.type === 'income' ? '+' : '-'}${fmt(Math.round(r.amount * 100))}${unitPriceText(r) ? `<span class="unit-price">${unitPriceText(r)}</span>` : ''}</td>
-        <td class="cell-note">${escapeHtml(r.note) || '<span class="muted">-</span>'}</td>
+        <td>${escapeHtml(r.note) || '<span class="muted">-</span>'}</td>
         <td><button class="row-btn" type="button" data-action="edit" data-id="${r.id}">修改</button>
             <button class="row-btn danger" type="button" data-action="delete" data-id="${r.id}">删除</button></td>
       </tr>`)
@@ -454,7 +466,6 @@ function resetForm() {
 }
 
 function switchTab(tab) {
-  state.tab = tab;
   $$('#tabs .tab').forEach((btn) => btn.classList.toggle('is-active', btn.dataset.tab === tab));
   $$('main .panel').forEach((panel) => panel.classList.toggle('is-active', panel.id === `panel-${tab}`));
 }
@@ -660,6 +671,47 @@ async function handleSubmit(event) {
 
 /* 页面内确认弹窗：避免浏览器 / 预览 WebView 屏蔽原生 confirm 导致操作无响应 */
 let confirmResolver = null;
+/* ---------------------- 每月支出预警额度：设置弹窗 ---------------------- */
+
+function openBudgetModal(month) {
+  const row = state.data.monthly.find((item) => `${state.year}-${item.month}` === month);
+  state.budgetMonth = month;
+
+  $('#budgetTitle').textContent = `设置 ${month} 支出预警额度`;
+  $('#budgetHint').textContent =
+    '留空保存表示清除该月设置；未设置的月份会自动沿用最近一次设置的额度。支出超过额度显示红色，达到额度 95% 显示黄色。';
+  $('#budgetInput').value = row && row.budgetValue > 0 ? String(row.budgetValue / 100) : '';
+  $('#budgetModal').hidden = false;
+  try { $('#budgetInput').focus({ preventScroll: true }); } catch { /* 忽略焦点兼容问题 */ }
+}
+
+function closeBudgetModal() {
+  if ($('#budgetModal').hidden) return;
+  $('#budgetModal').hidden = true;
+  state.budgetMonth = '';
+}
+
+async function saveBudget() {
+  const month = state.budgetMonth;
+  if (!month) return;
+
+  const text = $('#budgetInput').value.trim();
+  const amount = text === '' ? 0 : Number(text);
+  if (text !== '' && (!Number.isFinite(amount) || amount < 0)) {
+    toast('请输入正确的金额', 'error');
+    return;
+  }
+
+  try {
+    await api('/api/budgets', {}, { method: 'PUT', body: JSON.stringify({ month, amount }) });
+    closeBudgetModal();
+    toast(amount > 0 ? `${month} 额度已设置` : `${month} 额度已清除`);
+    await refresh();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
 function askConfirm(message, { title = '确认操作', okText = '确定' } = {}) {
   return new Promise((resolve) => {
     confirmResolver = resolve;
@@ -726,8 +778,22 @@ function bindEvents() {
   $('#confirmModal').addEventListener('click', (e) => {
     if (e.target === $('#confirmModal')) closeConfirm(false);
   });
+
+  // 每月支出预警额度
+  $('#budgetOk').addEventListener('click', saveBudget);
+  $('#budgetCancel').addEventListener('click', closeBudgetModal);
+  $('#budgetModal').addEventListener('click', (e) => {
+    if (e.target === $('#budgetModal')) closeBudgetModal();
+  });
+  $('#budgetInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveBudget();
+  });
+
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeConfirm(false);
+    if (e.key === 'Escape') {
+      closeConfirm(false);
+      closeBudgetModal();
+    }
   });
 
   // 导入 Excel
@@ -802,6 +868,8 @@ function bindEvents() {
     } else if (action === 'toggle-day') {
       state.expandedDay = state.expandedDay === date ? null : date;
       renderDaily();
+    } else if (action === 'set-budget') {
+      openBudgetModal(target.dataset.month);
     }
   });
 

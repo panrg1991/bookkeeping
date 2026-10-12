@@ -117,10 +117,9 @@ function toAmountCents(value) {
 }
 
 module.exports = {
-  WEEKDAYS,
+  // WEEKDAYS / parseDate 仅本模块内部使用（weekday 依赖），不对外导出
   pad2,
   todayStr,
-  parseDate,
   weekday,
   formatMoney,
   formatSigned,

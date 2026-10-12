@@ -28,7 +28,6 @@ Page({
     days: [],
     summary: {},
     hasData: false,
-    loading: true,
   },
 
   onShow() {
@@ -129,7 +128,6 @@ Page({
 
   async refresh() {
     const globalData = getApp().globalData;
-    this.setData({ loading: true });
 
     try {
       const years = await store.years();
@@ -172,7 +170,6 @@ Page({
         periodLabel,
         days,
         hasData: list.length > 0,
-        loading: false,
         summary: {
           income: fmt.formatMoney(sum.income),
           expense: fmt.formatMoney(sum.expense),
@@ -183,7 +180,6 @@ Page({
         },
       });
     } catch (err) {
-      this.setData({ loading: false });
       wx.showToast({ title: err.message, icon: 'none' });
     }
   },

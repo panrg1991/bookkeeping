@@ -10,12 +10,10 @@ Page({
     year: '',
     monthOptions: MONTH_OPTIONS,
     monthIndex: 0,
-    periodLabel: '',
     cards: [],
     rows: [],
     total: {},
     hasData: false,
-    loading: true,
   },
 
   onShow() {
@@ -41,9 +39,44 @@ Page({
     this.refresh();
   },
 
+  /** 设置某月的支出预警额度；留空表示清除该月设置 */
+  onSetBudget(e) {
+    const month = e.currentTarget.dataset.month;
+    const row = this.data.rows.find((item) => item.monthKey === month);
+    const current = row && row.budgetValue > 0 ? String(row.budgetValue / 100) : '';
+
+    wx.showModal({
+      title: `设置 ${month} 支出预警额度`,
+      editable: true,
+      placeholderText: '输入金额（元），留空表示清除',
+      content: current,
+      success: async (res) => {
+        if (!res.confirm) return;
+
+        const text = String(res.content === undefined || res.content === null ? '' : res.content).trim();
+        const cents = text === '' ? 0 : Math.round(Number(text) * 100);
+
+        if (text !== '' && (!Number.isFinite(cents) || cents < 0)) {
+          wx.showToast({ title: '请输入正确的金额', icon: 'none' });
+          return;
+        }
+
+        wx.showLoading({ title: '保存中', mask: true });
+        try {
+          await store.setBudget(month, cents);
+          wx.hideLoading();
+          wx.showToast({ title: cents > 0 ? '额度已设置' : '已清除额度', icon: 'success' });
+          this.refresh();
+        } catch (err) {
+          wx.hideLoading();
+          wx.showToast({ title: err.message, icon: 'none' });
+        }
+      },
+    });
+  },
+
   async refresh() {
     const globalData = getApp().globalData;
-    this.setData({ loading: true });
 
     try {
       const years = await store.years();
@@ -86,18 +119,29 @@ Page({
         },
       ];
 
-      const rows = summary.map((item) => ({
-        month: item.month,
-        label: `${year}-${item.month}`,
-        income: fmt.formatMoney(item.income),
-        expense: fmt.formatMoney(item.expense),
-        profit: fmt.formatSigned(item.profit),
-        profitCls: fmt.moneyClass(item.profit),
-        cumulative: fmt.formatSigned(item.cumulative),
-        cumulativeCls: fmt.moneyClass(item.cumulative),
-        count: item.count,
-        active: globalData.month === String(Number(item.month)),
-      }));
+      const rows = summary.map((item) => {
+        const monthKey = `${year}-${item.month}`;
+        // 预警额度只显示数字；未设置的月份自动沿用最近一次设置的额度（规则见列上方的提示行）
+        const budgetText = item.budget > 0 ? fmt.formatMoney(item.budget) : '点击设置';
+
+        return {
+          month: item.month,
+          monthKey,
+          label: monthKey,
+          income: fmt.formatMoney(item.income),
+          expense: fmt.formatMoney(item.expense),
+          budgetText,
+          budgetValue: item.budgetValue || 0,
+          budgetSet: item.budget > 0,
+          profit: fmt.formatSigned(item.profit),
+          profitCls: fmt.moneyClass(item.profit),
+          cumulative: fmt.formatSigned(item.cumulative),
+          cumulativeCls: fmt.moneyClass(item.cumulative),
+          count: item.count,
+          active: globalData.month === String(Number(item.month)),
+          alertCls: item.alert === 'over' ? 'alert-over' : (item.alert === 'near' ? 'alert-near' : ''),
+        };
+      });
 
       const sum = summary.reduce(
         (acc, item) => ({
@@ -114,7 +158,6 @@ Page({
         year,
         yearIndex: Math.max(years.indexOf(year), 0),
         monthIndex,
-        periodLabel,
         cards,
         rows,
         total: {
@@ -125,10 +168,8 @@ Page({
           count: sum.count,
         },
         hasData: sum.count > 0,
-        loading: false,
       });
     } catch (err) {
-      this.setData({ loading: false });
       wx.showToast({ title: err.message, icon: 'none' });
     }
   },

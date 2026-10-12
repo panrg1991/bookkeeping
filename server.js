@@ -149,6 +149,15 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/summary/monthly' && method === 'GET') {
       return sendJson(res, 200, store.monthlySummary(year));
     }
+
+    // 每月支出预警额度
+    if (pathname === '/api/budgets' && method === 'GET') {
+      return sendJson(res, 200, store.getBudgets(year));
+    }
+    if (pathname === '/api/budgets' && method === 'PUT') {
+      const body = await readJsonBody(req);
+      return sendJson(res, 200, store.setBudget(body.month, body.amount));
+    }
     if (pathname === '/api/summary/daily' && method === 'GET') {
       return sendJson(res, 200, store.dailySummary(year, month));
     }

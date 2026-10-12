@@ -28,9 +28,10 @@ const COLLECTIONS = {
   records: 'records',
   logs: 'logs',
   settings: 'settings',
+  budgets: 'budgets',
 };
 
-const COLLECTION_NAMES = ['records', 'logs', 'settings'];
+const COLLECTION_NAMES = ['records', 'logs', 'settings', 'budgets'];
 
 const DEFAULT_CATEGORIES = {
   expense: ['餐饮', '交通', '购物', '居住', '娱乐', '医疗', '教育', '通讯', '人情', '其他'],
@@ -540,6 +541,120 @@ async function overview(event, ctx) {
   return { period, year };
 }
 
+/* ------------------------------- 支出预警额度 ------------------------------- */
+
+/** 读取该用户设置过的额度：{ 'YYYY-MM': 分 } */
+async function readBudgets(openid) {
+  const res = await db.collection(COLLECTIONS.budgets).where({ _openid: openid }).limit(500).get();
+  const map = {};
+  res.data.forEach((doc) => {
+    if (/^\d{4}-\d{2}$/.test(doc.month) && Number(doc.amountCents) > 0) {
+      map[doc.month] = Number(doc.amountCents);
+    }
+  });
+  return map;
+}
+
+/**
+ * 计算某年 12 个月的「生效预警额度」：
+ * 当月设置过就用当月的；没设置则沿用最近一次设置的值（可跨月、跨年）；都没有则为 0（不预警）
+ */
+function buildBudgetMap(year, stored) {
+  const y = Number(year);
+  const source = stored || {};
+  const self = {};
+
+  Object.keys(source)
+    .filter((key) => /^\d{4}-\d{2}$/.test(key) && source[key] > 0 && key <= `${y}-12`)
+    .sort()
+    .forEach((key) => {
+      self[key] = source[key];
+    });
+
+  const setMonths = Object.keys(self).sort();
+  const result = {};
+
+  for (let m = 1; m <= 12; m += 1) {
+    const key = `${y}-${pad2(m)}`;
+    const own = self[key] || 0;
+    let from = '';
+    if (!own) {
+      for (let i = setMonths.length - 1; i >= 0; i -= 1) {
+        if (setMonths[i] < key) {
+          from = setMonths[i];
+          break;
+        }
+      }
+    }
+    result[key] = {
+      month: key,
+      budgetValue: own,
+      budget: own > 0 ? own : (from ? self[from] : 0),
+      budgetFrom: own > 0 ? '' : from,
+    };
+  }
+
+  return result;
+}
+
+/** 支出预警：超过额度 over（红）；达到额度 95% near（黄） */
+function budgetAlert(expenseCents, budgetCents) {
+  if (!(budgetCents > 0)) return 'none';
+  if (expenseCents > budgetCents) return 'over';
+  if (expenseCents >= budgetCents * 0.95) return 'near';
+  return 'none';
+}
+
+async function getBudgets(event, ctx) {
+  const stored = await readBudgets(ctx.openid);
+  const map = buildBudgetMap(event.year || new Date().getFullYear(), stored);
+  return Object.keys(map)
+    .sort()
+    .map((key) => map[key]);
+}
+
+async function setBudget(event, ctx) {
+  const key = String(event.month || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(key)) throw new Error('月份格式应为 YYYY-MM');
+
+  const cents = Math.max(0, Math.round(Number(event.amountCents) || 0));
+
+  // 先清掉同月的旧设置，再按需写入
+  const existing = await db
+    .collection(COLLECTIONS.budgets)
+    .where({ _openid: ctx.openid, month: key })
+    .limit(20)
+    .get();
+  for (const doc of existing.data) {
+    await db.collection(COLLECTIONS.budgets).doc(doc._id).remove();
+  }
+
+  if (cents > 0) {
+    await db.collection(COLLECTIONS.budgets).add({
+      data: {
+        _openid: ctx.openid,
+        month: key,
+        amountCents: cents,
+        updatedAt: db.serverDate(),
+        updatedAtMs: Date.now(),
+      },
+    });
+  }
+
+  const logError = await writeLogs([
+    buildLog(ctx, event, {
+      action: 'setBudget',
+      target: 'budgets',
+      summary:
+        cents > 0
+          ? `设置 ${key} 支出预警额度为 ${(cents / 100).toFixed(2)} 元`
+          : `清除 ${key} 的支出预警额度`,
+    }),
+  ]);
+
+  return { month: key, amountCents: cents, logError };
+}
+
 async function monthlySummary(event, ctx) {
   const year = String(event.year || new Date().getFullYear());
   const res = await db
@@ -562,12 +677,16 @@ async function monthlySummary(event, ctx) {
     map[month].count += row.count || 0;
   });
 
+  const budgets = buildBudgetMap(year, await readBudgets(ctx.openid));
+
   const list = [];
   let cumulative = 0;
   for (let m = 1; m <= 12; m += 1) {
     const key = pad2(m);
     const hit = map[key] || { income: 0, expense: 0, count: 0 };
     cumulative += hit.income - hit.expense;
+
+    const budgetInfo = budgets[`${year}-${key}`] || { budget: 0, budgetValue: 0, budgetFrom: '' };
     list.push({
       month: key,
       income: hit.income,
@@ -575,6 +694,10 @@ async function monthlySummary(event, ctx) {
       profit: hit.income - hit.expense,
       count: hit.count,
       cumulative,
+      budget: budgetInfo.budget,
+      budgetValue: budgetInfo.budgetValue,
+      budgetFrom: budgetInfo.budgetFrom,
+      alert: budgetAlert(hit.expense, budgetInfo.budget),
     });
   }
   return list;
@@ -807,6 +930,8 @@ const ACTIONS = {
   importRecords,
   overview,
   monthlySummary,
+  getBudgets,
+  setBudget,
   dailySummary,
   categorySummary,
   years,

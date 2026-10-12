@@ -33,6 +33,13 @@ db.exec(`
     type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
     UNIQUE (name, type)
   );
+
+  -- 每月支出预警额度（month 形如 '2026-10'）；未设置的月份沿用最近一次设置的值
+  CREATE TABLE IF NOT EXISTS budgets (
+    month        TEXT    PRIMARY KEY,
+    amount_cents INTEGER NOT NULL DEFAULT 0,
+    updated_at   TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
 `);
 
 /** 老库升级：SQLite 的 ADD COLUMN 不支持 IF NOT EXISTS，这里先查后加 */
@@ -365,6 +372,86 @@ function overview(year, month) {
   };
 }
 
+/* ------------------------------- 支出预警额度 ------------------------------- */
+
+/**
+ * 计算某年 12 个月的「生效预警额度」（分）：
+ * 当月设置过就用当月的；没设置则沿用**最近一次设置**的值（可跨月、跨年）；都没有则为 0（不预警）
+ */
+function buildBudgetMap(year) {
+  const y = Number(year);
+  const rows = db.prepare('SELECT month, amount_cents FROM budgets WHERE amount_cents > 0').all();
+  const self = {};
+  rows.forEach((row) => {
+    if (/^\d{4}-\d{2}$/.test(row.month) && row.month <= `${y}-12`) {
+      self[row.month] = row.amount_cents;
+    }
+  });
+
+  const setMonths = Object.keys(self).sort();
+  const result = {};
+
+  for (let m = 1; m <= 12; m += 1) {
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    const own = self[key] || 0;
+    let from = '';
+    if (!own) {
+      for (let i = setMonths.length - 1; i >= 0; i -= 1) {
+        if (setMonths[i] < key) {
+          from = setMonths[i];
+          break;
+        }
+      }
+    }
+    result[key] = {
+      month: key,
+      budgetValue: own,
+      budget: own > 0 ? own : (from ? self[from] : 0),
+      budgetFrom: own > 0 ? '' : from,
+    };
+  }
+
+  return result;
+}
+
+/** 支出预警：超过额度 over（红）；达到额度 95% near（黄） */
+function budgetAlert(expenseCents, budgetCents) {
+  if (!(budgetCents > 0)) return 'none';
+  if (expenseCents > budgetCents) return 'over';
+  if (expenseCents >= budgetCents * 0.95) return 'near';
+  return 'none';
+}
+
+/** 某年 12 个月的预警额度（含沿用来源） */
+function getBudgets(year) {
+  const y = normalizeYear(year);
+  const map = buildBudgetMap(y);
+  return Object.keys(map)
+    .sort()
+    .map((key) => map[key]);
+}
+
+/** 设置某月额度（金额单位为「元」；传 0 表示清除该月设置） */
+function setBudget(month, amount) {
+  const key = String(month || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(key)) throw httpError(400, '月份格式应为 YYYY-MM');
+
+  const cents = Math.max(0, Math.round((Number(amount) || 0) * 100));
+  if (cents > 1e14) throw httpError(400, '额度超出合理范围');
+
+  if (cents > 0) {
+    db.prepare(
+      `INSERT INTO budgets (month, amount_cents, updated_at)
+       VALUES (?, ?, datetime('now', 'localtime'))
+       ON CONFLICT(month) DO UPDATE SET amount_cents = excluded.amount_cents, updated_at = excluded.updated_at`
+    ).run(key, cents);
+  } else {
+    db.prepare('DELETE FROM budgets WHERE month = ?').run(key);
+  }
+
+  return { month: key, amount: cents / 100 };
+}
+
 function monthlySummary(year) {
   const y = normalizeYear(year);
   const rows = db
@@ -381,6 +468,8 @@ function monthlySummary(year) {
     .all(y);
 
   const map = new Map(rows.map((r) => [r.month, r]));
+  const budgets = buildBudgetMap(y);
+
   const list = [];
   let cumulative = 0;
   for (let m = 1; m <= 12; m += 1) {
@@ -388,6 +477,8 @@ function monthlySummary(year) {
     const income = map.get(key)?.income ?? 0;
     const expense = map.get(key)?.expense ?? 0;
     cumulative += income - expense;
+
+    const budgetInfo = budgets[`${y}-${key}`] || { budget: 0, budgetValue: 0, budgetFrom: '' };
     list.push({
       month: key,
       income,
@@ -395,6 +486,10 @@ function monthlySummary(year) {
       profit: income - expense,
       count: map.get(key)?.count ?? 0,
       cumulative,
+      budget: budgetInfo.budget,
+      budgetValue: budgetInfo.budgetValue,
+      budgetFrom: budgetInfo.budgetFrom,
+      alert: budgetAlert(expense, budgetInfo.budget),
     });
   }
   return list;
@@ -489,16 +584,16 @@ function addCategory(name, type) {
 }
 
 module.exports = {
-  db,
   DB_PATH,
   listRecords,
-  getRecord,
   createRecord,
   updateRecord,
   deleteRecord,
   importRecords,
   overview,
   monthlySummary,
+  getBudgets,
+  setBudget,
   dailySummary,
   categorySummary,
   years,

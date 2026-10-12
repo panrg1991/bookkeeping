@@ -69,6 +69,7 @@ utils/store.js  ── wx.cloud.callFunction ──►  云函数 bookkeeping（
 | `import` | 批量导入中的单条新增 |
 | `importBatch` | 一次导入的汇总（成功数、失败数、失败行） |
 | `importRejected` | 导入时被校验拒绝的行 |
+| `setBudget` | 设置 / 清除某月支出预警额度 |
 | `clearLogs` | 清理旧日志 |
 | `initDb` | 初始化集合 |
 | `read` | 查询（默认关闭，见下文开关） |
@@ -77,6 +78,13 @@ utils/store.js  ── wx.cloud.callFunction ──►  云函数 bookkeeping（
 ### 2.3 `settings`（分类字典）
 
 每个用户一条：`{ _openid, income: [], expense: [], createdAt, updatedAt }`。录入中出现新分类时由云函数自动追加。
+
+### 2.4 `budgets`（每月支出预警额度）
+
+每个用户每月最多一条：`{ _openid, month: '2026-10', amountCents, updatedAt }`。
+
+- 未设置的月份由云函数按「**沿用最近一次设置**」计算生效额度，可跨月、跨年
+- 支出超过生效额度 → `over`（月度明细表中显示红色背景）；支出 ≥ 生效额度的 95% → `near`（黄色背景）
 
 ## 三、数据隔离（怎么根据用户关联数据）
 
@@ -177,6 +185,7 @@ module.exports = {
 | `records` | `_openid` + `createdAtMs`（降序） | 同日期排序 |
 | `logs` | `_openid` + `createdAtMs`（降序） | 日志分页 |
 | `settings` | `_openid` | 分类字典查询 |
+| `budgets` | `_openid` + `month` | 每月预警额度查询 |
 
 云函数无法创建索引，需要在云开发控制台 → 数据库 → 索引管理里手动添加。
 

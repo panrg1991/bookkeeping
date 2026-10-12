@@ -15,7 +15,6 @@ Page({
     rows: [],
     total: { amount: '0.00', count: 0, kinds: 0 },
     hasData: false,
-    loading: true,
   },
 
   onShow() {
@@ -48,7 +47,6 @@ Page({
 
   async refresh() {
     const globalData = getApp().globalData;
-    this.setData({ loading: true });
 
     try {
       const years = await store.years();
@@ -71,7 +69,6 @@ Page({
         monthIndex,
         periodLabel,
         hasData: list.length > 0,
-        loading: false,
         rows: list.map((item) => ({
           category: item.category,
           count: item.count,
@@ -86,7 +83,6 @@ Page({
         },
       });
     } catch (err) {
-      this.setData({ loading: false });
       wx.showToast({ title: err.message, icon: 'none' });
     }
   },

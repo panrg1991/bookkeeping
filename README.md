@@ -10,6 +10,7 @@
 - **多笔明细**：同一天可记录任意多笔收支
 - **录入与维护**：表单录入（日期 / 类型 / 金额 / 分类 / 备注），支持修改、删除、分类自动补全
 - **单价 × 数量计价**：录入时可切换到「单价 × 数量」模式，金额由两者自动计算（以「分」为单位四舍五入，即金额保留两位小数）；列表、明细与 CSV 导出会一并显示单价与数量
+- **每月支出预警额度**：可为每个月单独设置支出额度（点击月度明细表中的「预警额度」单元格），支出超过额度显示红色背景、达到额度 95% 显示黄色背景；未设置的月份自动沿用最近一次设置的额度（可跨月、跨年）
 - **分类统计**：按支出或收入维度查看各分类金额与占比
 - **CSV 导出**：月度总览、每日明细、流水记录均可导出为 CSV（Excel 可直接打开）
 
@@ -17,7 +18,9 @@
 
 ## 运行
 
-要求 Node.js >= 22.5（使用内置的 `node:sqlite`，无需安装任何依赖）。
+要求 Node.js >= 22.5（使用内置的 `node:sqlite`，运行时无需安装任何依赖）。
+
+> `devDependencies` 中的 `xlsx` 仅用于更新 `public/vendor/xlsx.full.min.js`（前端导入 Excel 用的 SheetJS 浏览器版，已随仓库提交），日常运行不需要执行 `npm install`。
 
 ```bash
 npm start
@@ -43,6 +46,7 @@ db.js                SQLite 数据层：建表、CRUD、统计查询
 public/index.html    页面结构
 public/styles.css    Excel 报表风格样式
 public/app.js        前端逻辑：渲染、图表、表单、导出
+public/vendor/xlsx.full.min.js  导入 Excel 用的 SheetJS 浏览器版（已入库）
 data/bookkeeping.db  数据库文件（首次运行自动生成）
 ```
 
@@ -62,6 +66,8 @@ data/bookkeeping.db  数据库文件（首次运行自动生成）
 | note | TEXT | 备注 |
 | created_at / updated_at | TEXT | 时间戳 |
 
+表 `budgets`：每月支出预警额度（`month` 为主键，形如 `2026-10`；`amount_cents` 为该月额度）。未设置的月份自动沿用最近一次设置的额度，可跨月跨年。
+
 表 `categories`：分类字典（收入 / 支出各一套）。
 
 > 下拉框（分类输入框）里显示的分类 = **默认分类 ∪ 字典表 ∪ 记录中实际使用过的分类**。
@@ -77,7 +83,9 @@ data/bookkeeping.db  数据库文件（首次运行自动生成）
 | PUT | `/api/records/:id` | 修改记录（支持部分字段；改单价或数量会自动重算金额） |
 | DELETE | `/api/records/:id` | 删除记录 |
 | GET | `/api/summary/overview?year=&month=` | 本期与全年汇总（收入 / 支出 / 利润 / 笔数） |
-| GET | `/api/summary/monthly?year=` | 12 个月统计 |
+| GET | `/api/summary/monthly?year=` | 12 个月统计（含每月预警额度 `budget` / 本月设置值 `budgetValue` / 沿用来源 `budgetFrom` / 预警状态 `alert`：`over` 超额度、`near` 达 95%、`none`） |
+| GET | `/api/budgets?year=` | 某年各月支出预警额度（含沿用来源） |
+| PUT | `/api/budgets` | 设置某月额度 `{ month: '2026-10', amount }`（`amount` 为「元」，传 0 表示清除该月设置） |
 | GET | `/api/summary/daily?year=&month=` | 每日统计 |
 | GET | `/api/summary/category?year=&month=&type=` | 分类统计 |
 | GET | `/api/categories` | 分类字典 |

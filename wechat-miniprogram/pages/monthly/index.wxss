@@ -6,30 +6,68 @@
  * 横向滚动表格的宽度必须 ≥ 各列固定宽之和 + .tr 的左右内边距，否则滑到最右侧时
  * 最后一列（笔数）会被裁切/遮挡。
  *
- * 列宽：月份 160 + 数字列 190 × 4 + 笔数 130 = 1050rpx
- * 内边距：.tr 左右各 20rpx → 40rpx
- * 合计需要 1090rpx，这里取 1120rpx，右侧留约 30rpx 余量。
+ * 列宽：月份 130 + 收入 160 + 支出 160 + 预警额度 200 + 利润 160 + 累计利润 160 + 笔数 96 = 1066rpx
+ * 内边距：.tr 左右各 16rpx → 32rpx
+ * 合计需要 1098rpx，这里取 1120rpx，右侧留约 22rpx 余量。
+ * 列宽已按最小可读宽度收窄，尽量缩短左右滑动距离。
  */
 .table.fixed {
   width: 1120rpx;
 }
 
+/**
+ * 固定行高：未设置额度的月份单元格显示「点击设置」，若该单元格文本换行或生成
+ * 额外行盒，会把整行撑高，造成同一张表里行高忽高忽低。这里统一锁定行高，
+ * 并用 line-height 让单行内容垂直居中，保证所有行等高。
+ */
+.table.fixed .tr {
+  height: 64rpx;
+  box-sizing: border-box;
+  padding: 0 16rpx;
+  line-height: 64rpx;
+}
+
+.table.fixed .td.col-budget {
+  width: 200rpx;
+}
+
+/* 支出预警行背景：达到额度 95% 黄色；超过额度 红色（需覆盖当前月高亮色） */
+.table.fixed .tr.alert-near {
+  background: #fef3c7;
+}
+
+.table.fixed .tr.alert-over {
+  background: #fee2e2;
+}
+
+/* 可点击的预警额度单元格 */
+.budget-cell {
+  color: #2563eb;
+}
+
+.budget-cell.empty {
+  color: #9ca3af;
+}
+
 .table.fixed .td {
   flex: none;
   text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .table.fixed .td.col-month {
-  width: 160rpx;
+  width: 130rpx;
   text-align: left;
 }
 
 .table.fixed .td.col-num {
-  width: 190rpx;
+  width: 160rpx;
 }
 
 .table.fixed .td.col-count {
-  width: 130rpx;
+  width: 96rpx;
 }
 
 .tip {

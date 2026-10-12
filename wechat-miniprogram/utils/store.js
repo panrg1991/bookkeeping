@@ -30,6 +30,8 @@ const ASYNC_METHODS = [
   'importRecords',
   'overview',
   'monthlySummary',
+  'getBudgets',
+  'setBudget',
   'dailySummary',
   'categorySummary',
   'years',

@@ -47,7 +47,7 @@
         <span><i style="background:#dc2626"></i>支出</span>
       </div>
       <div class="chart" id="monthChart"></div>
-      <div class="table-wrap">
+      <div class="table-wrap month-wrap">
         <table class="grid" id="monthTable"></table>
       </div>
     </section>
@@ -179,6 +179,20 @@
       <div class="modal-actions">
         <button class="btn ghost" type="button" id="importCancel">取消</button>
         <button class="btn primary" type="button" id="importOk">确认导入</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-mask" id="budgetModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-title" id="budgetTitle">设置每月支出预警额度</div>
+      <div class="modal-body">
+        <p class="muted" id="budgetHint"></p>
+        <input type="number" id="budgetInput" step="0.01" min="0" placeholder="输入金额（元），留空表示清除" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" id="budgetCancel">取消</button>
+        <button class="btn primary" type="button" id="budgetOk">保存</button>
       </div>
     </div>
   </div>

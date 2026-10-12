@@ -75,6 +75,14 @@
 > 保存记录时**不再**自动往本表写新分类（旧实现会这么做，导致录错一次就长期留在下拉框里）；
 > 把记录的分类改掉或删除记录后，该分类会自动从下拉框消失。
 
+### `budgets`（每月支出预警额度）
+
+每个用户每月最多一条：`{ _openid, month: '2026-10', amountCents, updatedAt }`。
+
+- 未设置的月份由云函数按「**沿用最近一次设置**」计算生效额度，可跨月、跨年
+- 支出超过生效额度 → 预警 `over`（红色背景）；支出 ≥ 生效额度的 95% → `near`（黄色背景）
+- 该集合仅在云模式下使用；本地模式存在 `bk:budgets`（`{ 'YYYY-MM': 分 }`）
+
 ## 三、数据层 API（`utils/store.js`）
 
 所有方法都返回 Promise（云函数调用是异步的），与云函数 action 一一对应：
@@ -92,7 +100,9 @@
 | `deleteRecords(ids)` | `deleteRecords` | 批量删除（逐条校验归属并写 `delete` 日志），返回 `{ removed, skipped }` |
 | `importRecords(items, options)` | `importRecords` | 批量导入（逐条 + 汇总日志），返回 `{ inserted, skipped, errors, batchId }` |
 | `overview(year, month)` | `overview` | 本期 + 全年汇总（云端聚合） |
-| `monthlySummary(year)` | `monthlySummary` | 12 个月的收入、支出、利润、累计利润、笔数 |
+| `monthlySummary(year)` | `monthlySummary` | 12 个月的收入、支出、利润、累计利润、笔数，以及预警额度 `budget`、本月设置值 `budgetValue`、沿用来源 `budgetFrom`、预警状态 `alert`（`over` 超额度 / `near` 达 95% / `none`） |
+| `getBudgets(year)` | `getBudgets` | 某年 12 个月的支出预警额度（含沿用来源） |
+| `setBudget(month, amountCents)` | `setBudget` | 设置某月额度（单位「分」），传 0 表示清除该月设置 |
 | `dailySummary(year, month)` | `dailySummary` | 每天的收入、支出、净额、笔数 |
 | `categorySummary(year, month, type)` | `categorySummary` | 各分类金额、笔数、占比 |
 | `years()` | `years` | 已有数据的年份 |

@@ -123,6 +123,16 @@ module.exports = {
     return call('monthlySummary', { year });
   },
 
+  /** 某年 12 个月的支出预警额度（含沿用来源） */
+  getBudgets(year) {
+    return call('getBudgets', { year });
+  },
+
+  /** 设置某月预警额度（分）；传 0 表示清除该月设置 */
+  setBudget(month, amountCents) {
+    return call('setBudget', { month, amountCents });
+  },
+
   dailySummary(year, month) {
     return call('dailySummary', { year, month });
   },

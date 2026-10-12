@@ -24,13 +24,6 @@ module.exports = {
   /** 统一业务云函数名（cloudfunctions/bookkeeping），仅云模式使用 */
   cloudFunction: 'bookkeeping',
 
-  /** 集合名，需与云函数内保持一致，仅云模式使用 */
-  collections: {
-    records: 'records',
-    logs: 'logs',
-    settings: 'settings',
-  },
-
   /** 单次列表拉取上限 */
   maxListSize: 2000,
 };

@@ -215,6 +215,34 @@ main { padding: 16px 28px 40px; }
   max-height: 62vh;
 }
 
+/* 月度总览：行数固定（12 个月 + 合计）且不多，完整展开不出现滚动条；
+   同时收敛列宽与整体宽度，避免超宽屏下每列被拉得过散 */
+.table-wrap.month-wrap {
+  max-height: none;
+  max-width: 1180px;
+}
+/* 锁定行高：无论单元格里是金额还是「点击设置」，所有行保持一致高度 */
+.month-wrap th,
+.month-wrap td {
+  height: 30px;
+  box-sizing: border-box;
+}
+.month-wrap table.grid {
+  table-layout: fixed;
+}
+.month-wrap th:first-child,
+.month-wrap td:first-child {
+  width: 116px;
+}
+.month-wrap th:nth-child(7),
+.month-wrap td:nth-child(7) {
+  width: 74px;
+}
+.month-wrap th:nth-child(8),
+.month-wrap td:nth-child(8) {
+  width: 84px;
+}
+
 table.grid {
   width: 100%;
   border-collapse: separate;
@@ -223,7 +251,8 @@ table.grid {
 }
 
 table.grid th, table.grid td {
-  padding: 9px 12px;
+  padding: 6px 10px;
+  line-height: 1.4;
   border-bottom: 1px solid var(--border);
   text-align: left;
   white-space: nowrap;
@@ -368,6 +397,20 @@ tr.detail-row td { border-bottom: 1px solid var(--border); padding: 7px 12px; wh
 }
 .import-errors-title { font-weight: 600; margin-bottom: 2px; }
 .import-errors ul { margin: 4px 0 0; padding-left: 18px; }
+
+/* ---------------- 每月支出预警额度 ---------------- */
+/* 放在表格样式之后，确保能覆盖斑马纹与 hover 背景 */
+table.grid tbody tr.active { background: #eff6ff; }
+table.grid tbody tr.alert-near { background: #fef3c7; }
+table.grid tbody tr.alert-over { background: #fee2e2; }
+table.grid tbody tr.alert-near:hover { background: #fde68a; }
+table.grid tbody tr.alert-over:hover { background: #fecaca; }
+
+.budget-cell { color: var(--primary); cursor: pointer; }
+.budget-cell.empty { color: var(--muted); }
+.budget-cell:hover { text-decoration: underline; }
+
+#budgetInput { width: 100%; box-sizing: border-box; }
 
 @media (max-width: 900px) {
   .cards { grid-template-columns: repeat(2, 1fr); }

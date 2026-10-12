@@ -16,6 +16,7 @@ const RECORDS_KEY = 'bk:records';
 const CATEGORIES_KEY = 'bk:categories';
 const SEQ_KEY = 'bk:seq';
 const LOGS_KEY = 'bk:logs';
+const BUDGETS_KEY = 'bk:budgets';
 
 const DEFAULT_CATEGORIES = {
   expense: ['餐饮', '交通', '购物', '居住', '娱乐', '医疗', '教育', '通讯', '人情', '其他'],
@@ -403,6 +404,101 @@ function overview(year, month) {
   };
 }
 
+/* --------------------------------- 支出预警额度 -------------------------------- */
+
+/** 读取额度设置：{ 'YYYY-MM': 分 } */
+function readBudgets() {
+  const raw = wx.getStorageSync(BUDGETS_KEY);
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+}
+
+function writeBudgets(map) {
+  wx.setStorageSync(BUDGETS_KEY, map);
+}
+
+/**
+ * 计算某年 12 个月的「生效预警额度」：
+ * 当月设置过就用当月的；没设置则沿用**最近一次设置**的值（可跨月、跨年）；都没有则为 0（不预警）
+ */
+function buildBudgetMap(year) {
+  const y = Number(year);
+  const stored = readBudgets();
+  const self = {};
+
+  Object.keys(stored)
+    .filter((key) => /^\d{4}-\d{2}$/.test(key) && Number(stored[key]) > 0 && key <= `${y}-12`)
+    .sort()
+    .forEach((key) => {
+      self[key] = Number(stored[key]);
+    });
+
+  const setMonths = Object.keys(self).sort();
+  const result = {};
+
+  for (let m = 1; m <= 12; m += 1) {
+    const key = `${y}-${fmt.pad2(m)}`;
+    const own = self[key] || 0;
+    let from = '';
+    if (!own) {
+      for (let i = setMonths.length - 1; i >= 0; i -= 1) {
+        if (setMonths[i] < key) {
+          from = setMonths[i];
+          break;
+        }
+      }
+    }
+    result[key] = {
+      month: key,
+      budgetValue: own,
+      budget: own > 0 ? own : (from ? self[from] : 0),
+      budgetFrom: own > 0 ? '' : from,
+    };
+  }
+
+  return result;
+}
+
+/** 支出预警：超过额度 over（红）；达到额度 95% near（黄） */
+function budgetAlert(expenseCents, budgetCents) {
+  if (!(budgetCents > 0)) return 'none';
+  if (expenseCents > budgetCents) return 'over';
+  if (expenseCents >= budgetCents * 0.95) return 'near';
+  return 'none';
+}
+
+/** 某年 12 个月的预警额度（含沿用来源） */
+function getBudgets(year) {
+  const map = buildBudgetMap(year);
+  return Object.keys(map)
+    .sort()
+    .map((key) => map[key]);
+}
+
+/** 设置某月额度（分）；传 0 表示清除该月设置（之后月份继续沿用更早的设置） */
+function setBudget(month, amountCents) {
+  const key = String(month || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(key)) throw new Error('月份格式应为 YYYY-MM');
+
+  const cents = Math.max(0, Math.round(Number(amountCents) || 0));
+  const stored = Object.assign({}, readBudgets());
+  if (cents > 0) stored[key] = cents;
+  else delete stored[key];
+  writeBudgets(stored);
+
+  appendLogs([
+    buildLog({
+      action: 'setBudget',
+      target: 'budgets',
+      summary:
+        cents > 0
+          ? `设置 ${key} 支出预警额度为 ${(cents / 100).toFixed(2)} 元`
+          : `清除 ${key} 的支出预警额度`,
+    }),
+  ]);
+
+  return { month: key, amountCents: cents };
+}
+
 function monthlySummary(year) {
   const grouped = {};
   periodRecords(year, null).forEach((item) => {
@@ -413,19 +509,26 @@ function monthlySummary(year) {
     else grouped[key].expense += item.amountCents;
   });
 
+  const budgets = buildBudgetMap(year);
   const list = [];
   let cumulative = 0;
   for (let m = 1; m <= 12; m += 1) {
-    const key = fmt.pad2(m);
-    const hit = grouped[key] || { income: 0, expense: 0, count: 0 };
+    const mm = fmt.pad2(m);
+    const hit = grouped[mm] || { income: 0, expense: 0, count: 0 };
     cumulative += hit.income - hit.expense;
+
+    const budgetInfo = budgets[`${year}-${mm}`] || { budget: 0, budgetValue: 0, budgetFrom: '' };
     list.push({
-      month: key,
+      month: mm,
       income: hit.income,
       expense: hit.expense,
       profit: hit.income - hit.expense,
       count: hit.count,
       cumulative,
+      budget: budgetInfo.budget,
+      budgetValue: budgetInfo.budgetValue,
+      budgetFrom: budgetInfo.budgetFrom,
+      alert: budgetAlert(hit.expense, budgetInfo.budget),
     });
   }
   return list;
@@ -674,6 +777,8 @@ module.exports = {
   importRecords,
   overview,
   monthlySummary,
+  getBudgets,
+  setBudget,
   dailySummary,
   categorySummary,
   years,
