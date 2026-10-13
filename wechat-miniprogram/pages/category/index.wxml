@@ -34,4 +34,41 @@
 
     <view class="empty" wx:if="{{!hasData}}">{{periodLabel}}暂无{{type === 'expense' ? '支出' : '收入'}}数据</view>
   </view>
+
+  <view class="card">
+    <view class="combo-head">
+      <text class="card-title">组合计算</text>
+      <text class="combo-clear" wx:if="{{comboInput}}" bindtap="onComboClear">清空</text>
+    </view>
+    <view class="muted combo-tip">输入 2~8 个数（逗号、空格或换行分隔），可同时选择多种组合方式，结果为它们各自的组合乘积之和相加。</view>
+
+    <textarea
+      class="combo-input"
+      value="{{comboInput}}"
+      placeholder="例如：2,3,2"
+      placeholder-class="combo-placeholder"
+      maxlength="1000"
+      auto-height
+      bindinput="onComboInput"
+    />
+
+    <view class="muted combo-pick-tip">组合方式（可多选）</view>
+    <view class="combo-ks">
+      <view
+        class="combo-k {{item.active ? 'on' : ''}} {{item.enabled ? '' : 'off'}}"
+        wx:for="{{comboOptions}}"
+        wx:key="k"
+        data-k="{{item.k}}"
+        bindtap="onComboKToggle"
+      >{{item.k}} 个数</view>
+    </view>
+
+    <view class="combo-error" wx:if="{{comboError}}">{{comboError}}</view>
+    <view class="muted combo-notice" wx:if="{{comboNotice}}">{{comboNotice}}</view>
+
+    <view class="combo-result" wx:if="{{comboSum}}">
+      <text class="muted">{{comboLabel}} 个数组合 · 共 {{comboCount}} 组 · 乘积之和</text>
+      <text class="combo-sum">{{comboSum}}</text>
+    </view>
+  </view>
 </view>
