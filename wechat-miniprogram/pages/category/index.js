@@ -20,9 +20,11 @@ Page({
     total: { amount: '0.00', count: 0, kinds: 0 },
     hasData: false,
     // 组合计算：comboKs 为已选中的组合方式（可同时选多个），结果只给一个总数
+    // comboReady：输入框里有有效数字时才显示组合方式与结果
     comboInput: '',
     comboKs: [2],
     comboOptions: [],
+    comboReady: false,
     comboLabel: '2',
     comboSum: '',
     comboCount: 0,
@@ -96,6 +98,7 @@ Page({
   onComboClear() {
     this.setData({
       comboInput: '',
+      comboReady: false,
       comboSum: '',
       comboCount: 0,
       comboError: '',
@@ -113,14 +116,16 @@ Page({
     const comboOptions = COMBO_K_OPTIONS.map((k) => ({
       k,
       active: ks.indexOf(k) >= 0,
-      // 输入个数不足的组合方式不可用（还没输入时都允许选）
-      enabled: !total || k <= total,
+      // 输入个数不足的组合方式不可用
+      enabled: k <= total,
     }));
 
     const usable = ks.filter((k) => k <= total);
     if (!usable.length) {
+      // 没有有效数字（输入框被清空）时一并隐藏组合方式与结果
       this.setData({
         comboOptions,
+        comboReady: false,
         comboSum: '',
         comboCount: 0,
         comboError: total ? `已选的组合方式至少需要 ${Math.min.apply(null, ks)} 个数，当前只有 ${total} 个` : '',
@@ -133,6 +138,7 @@ Page({
 
     this.setData({
       comboOptions,
+      comboReady: true,
       comboError: '',
       comboNotice: tips.join('；'),
       comboLabel: usable.join('、'),

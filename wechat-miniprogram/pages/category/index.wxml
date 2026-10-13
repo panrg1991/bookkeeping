@@ -52,16 +52,18 @@
       bindinput="onComboInput"
     />
 
-    <view class="muted combo-pick-tip">组合方式（可多选）</view>
-    <view class="combo-ks">
-      <view
-        class="combo-k {{item.active ? 'on' : ''}} {{item.enabled ? '' : 'off'}}"
-        wx:for="{{comboOptions}}"
-        wx:key="k"
-        data-k="{{item.k}}"
-        bindtap="onComboKToggle"
-      >{{item.k}} 个数</view>
-    </view>
+    <block wx:if="{{comboReady}}">
+      <view class="muted combo-pick-tip">组合方式（可多选）</view>
+      <view class="combo-ks">
+        <view
+          class="combo-k {{item.active ? 'on' : ''}} {{item.enabled ? '' : 'off'}}"
+          wx:for="{{comboOptions}}"
+          wx:key="k"
+          data-k="{{item.k}}"
+          bindtap="onComboKToggle"
+        >{{item.k}} 个数</view>
+      </view>
+    </block>
 
     <view class="combo-error" wx:if="{{comboError}}">{{comboError}}</view>
     <view class="muted combo-notice" wx:if="{{comboNotice}}">{{comboNotice}}</view>
