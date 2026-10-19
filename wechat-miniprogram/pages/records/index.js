@@ -137,6 +137,13 @@ Page({
     this.refresh().then(() => wx.stopPullDownRefresh());
   },
 
+  onUnload() {
+    if (this.keywordTimer) {
+      clearTimeout(this.keywordTimer);
+      this.keywordTimer = null;
+    }
+  },
+
   /* ------------------------------ 分类字典 ----------------------------- */
 
   async loadCategories() {
@@ -173,8 +180,14 @@ Page({
   },
 
   onKeywordInput(e) {
-    this.setData({ keyword: e.detail.value });
-    this.refresh();
+    const keyword = e.detail.value;
+    this.setData({ keyword });
+    // 防抖：云模式下每敲一个字就发起一次查询会带来明显延迟与配额消耗
+    if (this.keywordTimer) clearTimeout(this.keywordTimer);
+    this.keywordTimer = setTimeout(() => {
+      this.keywordTimer = null;
+      this.refresh();
+    }, 300);
   },
 
   /* ------------------------------ 录入表单 ----------------------------- */
@@ -266,6 +279,9 @@ Page({
   },
 
   async onSubmit() {
+    // 提交期间加锁，避免快速连点写入重复记录
+    if (this.saving) return;
+
     const { form, calcMode } = this.data;
     if (!form.date) {
       wx.showToast({ title: '请选择日期', icon: 'none' });
@@ -309,6 +325,7 @@ Page({
     }
 
     wx.showLoading({ title: '保存中', mask: true });
+    this.saving = true;
     try {
       if (this.data.editingId) {
         const res = await store.updateRecord(this.data.editingId, payload);
@@ -338,6 +355,8 @@ Page({
     } catch (err) {
       wx.hideLoading();
       wx.showToast({ title: err.message, icon: 'none' });
+    } finally {
+      this.saving = false;
     }
   },
 

@@ -38,17 +38,45 @@ node --no-warnings server.js
 | `HOST` | 监听地址 | `127.0.0.1` |
 | `DB_PATH` | SQLite 文件路径 | `./data/bookkeeping.db` |
 
+> ⚠️ **安全说明（重要）**：本服务**没有任何鉴权**，任何能访问到该端口的人都可以读写全部账目数据。因此：
+> - `HOST` 默认是 `127.0.0.1`，**仅本机可访问**，请勿随意改成 `0.0.0.0` 或公网 IP；
+> - 若确需局域网 / 公网访问，请务必在前面加一层带认证的反向代理（如 Basic Auth、登录鉴权）；
+> - 切勿把端口直接暴露到公网。
+
+## 测试
+
+```bash
+npm test
+# 或
+node --no-warnings --test
+```
+
+使用 Node 内置测试运行器（`node:test`，无需额外依赖），覆盖：
+
+- 预算额度规则（当月设置、跨月/跨年沿用、阈值预警），并校验 **Node 后端 / 小程序本地存储 / 云函数三份副本行为完全一致**；
+- 金额、日期、CSV 格式化（含 CSV/Excel 公式注入防护）；
+- 组合计算工具（`utils/combine.js`）；
+- 数据层（`db.js`）的 CRUD、汇总统计与参数校验（使用临时数据库，不影响 `data/bookkeeping.db`）。
+
 ## 目录结构
 
 ```
 server.js            HTTP 服务 + REST API（零第三方依赖）
 db.js                SQLite 数据层：建表、CRUD、统计查询
+budget.js            每月支出预警额度：纯计算逻辑（与小程序/云函数共享同一份规则）
 public/index.html    页面结构
 public/styles.css    Excel 报表风格样式
 public/app.js        前端逻辑：渲染、图表、表单、导出
 public/vendor/xlsx.full.min.js  导入 Excel 用的 SheetJS 浏览器版（已入库）
+test/                自动化测试（node:test）
 data/bookkeeping.db  数据库文件（首次运行自动生成）
 ```
+
+> `budget.js` 的纯计算逻辑在小程序端与云函数中各有一份副本，用于：
+> `wechat-miniprogram/utils/budget.js`（本地存储模式）、`wechat-miniprogram/cloudfunctions/bookkeeping/budget.js`（云函数）。
+> 三者运行 / 部署环境相互独立，无法互相 `require`，因此各自保留一份**内容一致**的副本；
+> `test/budget.test.js` 会校验三份行为完全一致，修改时请同步三处。
+
 
 ## 数据结构
 

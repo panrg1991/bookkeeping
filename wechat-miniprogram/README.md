@@ -55,6 +55,8 @@ utils/store.js                   数据层门面：按 mode 选择实现，统�
 utils/store.local.js             本地存储实现（当前启用）
 utils/store.cloud.js             云开发实现（调用云函数，切回云模式时使用）
 utils/format.js                  金额（分 -> 元，带千分位）、日期、CSV、粘贴解析等纯工具
+utils/budget.js                  每月支出预警额度：纯计算逻辑（与 Node 后端、云函数保持同一份规则）
+utils/combine.js                 组合计算工具（从若干个数中任选 k 个，求组合乘积之和）
 pages/monthly/                   月度总览
 pages/daily/                     每日明细
 pages/records/                   流水记录（录入 / 修改 / 删除 / 导入 / 导出）

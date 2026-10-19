@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node --no-warnings server.js",
-    "dev": "node --no-warnings server.js"
+    "dev": "node --no-warnings server.js",
+    "test": "node --no-warnings --test"
   },
   "engines": {
     "node": ">=22.5.0"

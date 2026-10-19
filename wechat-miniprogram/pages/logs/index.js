@@ -17,6 +17,8 @@ const FIELD_LABELS = {
   date: '日期',
   type: '类型',
   amountCents: '金额',
+  unitPriceCents: '单价',
+  quantity: '数量',
   category: '分类',
   note: '备注',
 };
@@ -40,6 +42,7 @@ function formatTime(ms) {
 function formatField(key, data) {
   if (!data) return '-';
   if (key === 'amountCents') return `${(Number(data.amountCents || 0) / 100).toFixed(2)} 元`;
+  if (key === 'unitPriceCents') return `${(Number(data.unitPriceCents || 0) / 100).toFixed(2)} 元`;
   if (key === 'type') return data.type === 'income' ? '收入' : '支出';
   return String(data[key] == null || data[key] === '' ? '-' : data[key]);
 }

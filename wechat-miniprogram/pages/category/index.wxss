@@ -34,8 +34,10 @@
 }
 
 .combo-input {
+  display: block;
   width: 100%;
-  min-height: 92rpx;
+  /* 固定高度：避免 auto-height 在聚焦时重算高度导致键盘闪烁；内容超出时组件内部滚动 */
+  height: 160rpx;
   box-sizing: border-box;
   padding: 16rpx 20rpx;
   background: #f8fafc;

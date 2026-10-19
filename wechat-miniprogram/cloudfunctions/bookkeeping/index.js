@@ -17,6 +17,7 @@
  */
 
 const cloud = require('wx-server-sdk');
+const budget = require('./budget');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
@@ -88,6 +89,7 @@ function normalizeRecord(input) {
   const unitPriceCents = Math.max(0, Math.round(Number(source.unitPriceCents) || 0));
   const quantity = Math.max(0, Number(source.quantity) || 0);
   if (quantity > 1e9) throw new Error('数量超出合理范围');
+  if (unitPriceCents > 1e14) throw new Error('单价超出合理范围');
 
   // 单价 × 数量 计价：两者都大于 0 时金额由它们计算（以分为单位四舍五入 = 保留两位小数）
   let amountCents;
@@ -97,8 +99,8 @@ function normalizeRecord(input) {
   } else {
     amountCents = Math.round(Number(source.amountCents));
     if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error('金额必须大于 0（也可填写单价与数量自动计算）');
-    if (amountCents > 1e12) throw new Error('金额超出合理范围');
   }
+  if (amountCents > 1e14) throw new Error('金额超出合理范围');
 
   const category = String(source.category || '').trim().slice(0, 30) || '其他';
   const note = String(source.note || '').trim().slice(0, 200);
@@ -111,6 +113,8 @@ function pickRecord(doc) {
     date: doc.date,
     type: doc.type,
     amountCents: doc.amountCents,
+    unitPriceCents: doc.unitPriceCents || 0,
+    quantity: doc.quantity || 0,
     category: doc.category,
     note: doc.note,
   };
@@ -124,7 +128,7 @@ function toRecord(doc) {
   });
 }
 
-const RECORD_FIELDS = ['date', 'type', 'amountCents', 'category', 'note'];
+const RECORD_FIELDS = ['date', 'type', 'amountCents', 'unitPriceCents', 'quantity', 'category', 'note'];
 
 function diffKeys(before, after) {
   return RECORD_FIELDS.filter((key) => before[key] !== after[key]);
@@ -558,52 +562,14 @@ async function readBudgets(openid) {
 /**
  * 计算某年 12 个月的「生效预警额度」：
  * 当月设置过就用当月的；没设置则沿用最近一次设置的值（可跨月、跨年）；都没有则为 0（不预警）
+ * 纯计算逻辑见 ./budget.js（与 Node 后端、小程序本地存储共享同一份规则）。
  */
 function buildBudgetMap(year, stored) {
-  const y = Number(year);
-  const source = stored || {};
-  const self = {};
-
-  Object.keys(source)
-    .filter((key) => /^\d{4}-\d{2}$/.test(key) && source[key] > 0 && key <= `${y}-12`)
-    .sort()
-    .forEach((key) => {
-      self[key] = source[key];
-    });
-
-  const setMonths = Object.keys(self).sort();
-  const result = {};
-
-  for (let m = 1; m <= 12; m += 1) {
-    const key = `${y}-${pad2(m)}`;
-    const own = self[key] || 0;
-    let from = '';
-    if (!own) {
-      for (let i = setMonths.length - 1; i >= 0; i -= 1) {
-        if (setMonths[i] < key) {
-          from = setMonths[i];
-          break;
-        }
-      }
-    }
-    result[key] = {
-      month: key,
-      budgetValue: own,
-      budget: own > 0 ? own : (from ? self[from] : 0),
-      budgetFrom: own > 0 ? '' : from,
-    };
-  }
-
-  return result;
+  return budget.buildBudgetMap(year, stored);
 }
 
 /** 支出预警：超过额度 over（红）；达到额度 95% near（黄） */
-function budgetAlert(expenseCents, budgetCents) {
-  if (!(budgetCents > 0)) return 'none';
-  if (expenseCents > budgetCents) return 'over';
-  if (expenseCents >= budgetCents * 0.95) return 'near';
-  return 'none';
-}
+const budgetAlert = budget.budgetAlert;
 
 async function getBudgets(event, ctx) {
   const stored = await readBudgets(ctx.openid);
@@ -617,7 +583,10 @@ async function setBudget(event, ctx) {
   const key = String(event.month || '').trim();
   if (!/^\d{4}-\d{2}$/.test(key)) throw new Error('月份格式应为 YYYY-MM');
 
-  const cents = Math.max(0, Math.round(Number(event.amountCents) || 0));
+  const raw = Number(event.amountCents);
+  const cents = Number.isFinite(raw) ? Math.round(raw) : 0;
+  if (cents < 0) throw new Error('额度不能为负数');
+  if (cents > 1e14) throw new Error('额度超出合理范围');
 
   // 先清掉同月的旧设置，再按需写入
   const existing = await db

@@ -470,9 +470,19 @@ function switchTab(tab) {
   $$('main .panel').forEach((panel) => panel.classList.toggle('is-active', panel.id === `panel-${tab}`));
 }
 
+/** 防 CSV 公式注入：以 = + @ 或制表符开头的单元格前置单引号；
+ *  负号开头仅在不是纯数字时才处理，避免把负数金额误判为公式 */
+function csvSafe(value) {
+  const text = String(value ?? '');
+  if (/^[=+@\t\r]/.test(text) || (/^-/.test(text) && !/^-?\d+(\.\d+)?$/.test(text))) {
+    return `'${text}`;
+  }
+  return text;
+}
+
 function downloadCsv(filename, rows) {
   const content = `﻿${rows.map((row) => row.map((cell) => {
-    const text = String(cell ?? '');
+    const text = csvSafe(cell);
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   }).join(',')).join('\r\n')}`;
   const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
@@ -654,6 +664,10 @@ async function handleSubmit(event) {
     payload.quantity = 0;
   }
 
+  // 提交期间禁用按钮，避免快速双击写入重复记录
+  const submitBtn = $('#submitBtn');
+  if (submitBtn.disabled) return;
+  submitBtn.disabled = true;
   try {
     if (state.editingId) {
       await api(`/api/records/${state.editingId}`, {}, { method: 'PUT', body: JSON.stringify(payload) });
@@ -666,6 +680,8 @@ async function handleSubmit(event) {
     await refresh();
   } catch (err) {
     toast(err.message, 'error');
+  } finally {
+    submitBtn.disabled = false;
   }
 }
 

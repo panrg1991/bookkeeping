@@ -11,6 +11,7 @@
  */
 
 const fmt = require('./format');
+const budget = require('./budget');
 
 const RECORDS_KEY = 'bk:records';
 const CATEGORIES_KEY = 'bk:categories';
@@ -92,7 +93,7 @@ function normalizeInput(input) {
   const source = input || {};
 
   const date = String(source.date || '').trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('日期格式应为 YYYY-MM-DD');
+  if (!fmt.isValidDate(date)) throw new Error('日期格式应为 YYYY-MM-DD（且必须是真实存在的日期）');
 
   const type = source.type;
   if (type !== 'income' && type !== 'expense') throw new Error('类型只能是收入或支出');
@@ -110,6 +111,8 @@ function normalizeInput(input) {
     amountCents = Math.round(Number(source.amountCents));
     if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error('金额必须大于 0（也可填写单价与数量自动计算）');
   }
+  if (amountCents > fmt.MAX_AMOUNT_CENTS) throw new Error('金额超出合理范围');
+  if (unitPriceCents > fmt.MAX_AMOUNT_CENTS) throw new Error('单价超出合理范围');
 
   const category = String(source.category || '').trim().slice(0, 30) || '其他';
   const note = String(source.note || '').trim().slice(0, 200);
@@ -419,52 +422,14 @@ function writeBudgets(map) {
 /**
  * 计算某年 12 个月的「生效预警额度」：
  * 当月设置过就用当月的；没设置则沿用**最近一次设置**的值（可跨月、跨年）；都没有则为 0（不预警）
+ * 纯计算逻辑见 ./budget.js（与 Node 后端、云函数共享同一份规则）。
  */
 function buildBudgetMap(year) {
-  const y = Number(year);
-  const stored = readBudgets();
-  const self = {};
-
-  Object.keys(stored)
-    .filter((key) => /^\d{4}-\d{2}$/.test(key) && Number(stored[key]) > 0 && key <= `${y}-12`)
-    .sort()
-    .forEach((key) => {
-      self[key] = Number(stored[key]);
-    });
-
-  const setMonths = Object.keys(self).sort();
-  const result = {};
-
-  for (let m = 1; m <= 12; m += 1) {
-    const key = `${y}-${fmt.pad2(m)}`;
-    const own = self[key] || 0;
-    let from = '';
-    if (!own) {
-      for (let i = setMonths.length - 1; i >= 0; i -= 1) {
-        if (setMonths[i] < key) {
-          from = setMonths[i];
-          break;
-        }
-      }
-    }
-    result[key] = {
-      month: key,
-      budgetValue: own,
-      budget: own > 0 ? own : (from ? self[from] : 0),
-      budgetFrom: own > 0 ? '' : from,
-    };
-  }
-
-  return result;
+  return budget.buildBudgetMap(year, readBudgets());
 }
 
 /** 支出预警：超过额度 over（红）；达到额度 95% near（黄） */
-function budgetAlert(expenseCents, budgetCents) {
-  if (!(budgetCents > 0)) return 'none';
-  if (expenseCents > budgetCents) return 'over';
-  if (expenseCents >= budgetCents * 0.95) return 'near';
-  return 'none';
-}
+const budgetAlert = budget.budgetAlert;
 
 /** 某年 12 个月的预警额度（含沿用来源） */
 function getBudgets(year) {
@@ -479,7 +444,10 @@ function setBudget(month, amountCents) {
   const key = String(month || '').trim();
   if (!/^\d{4}-\d{2}$/.test(key)) throw new Error('月份格式应为 YYYY-MM');
 
-  const cents = Math.max(0, Math.round(Number(amountCents) || 0));
+  const raw = Number(amountCents);
+  const cents = Number.isFinite(raw) ? Math.round(raw) : 0;
+  if (cents < 0) throw new Error('额度不能为负数');
+  if (cents > fmt.MAX_AMOUNT_CENTS) throw new Error('额度超出合理范围');
   const stored = Object.assign({}, readBudgets());
   if (cents > 0) stored[key] = cents;
   else delete stored[key];

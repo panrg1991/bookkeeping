@@ -29,20 +29,25 @@ function sendJson(res, status, payload) {
   res.end(body);
 }
 
+const MAX_BODY_BYTES = 1e6;
+
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
-    let raw = '';
+    let size = 0;
+    const chunks = [];
     req.on('data', (chunk) => {
-      raw += chunk;
-      if (raw.length > 1e6) {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
         reject(store.httpError(413, '请求体过大'));
         req.destroy();
+        return;
       }
+      chunks.push(chunk);
     });
     req.on('end', () => {
-      if (!raw) return resolve({});
+      if (!chunks.length) return resolve({});
       try {
-        const parsed = JSON.parse(raw);
+        const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
         if (!parsed || typeof parsed !== 'object') throw new Error();
         resolve(parsed);
       } catch {
@@ -53,11 +58,25 @@ function readJsonBody(req) {
   });
 }
 
-async function serveStatic(res, pathname) {
-  const relative = decodeURIComponent(pathname).replace(/^\/+/, '');
+/** 归一化后判断目标文件是否确实位于 PUBLIC_DIR 内（避免前缀相同的兄弟目录绕过） */
+function isInsidePublic(filePath) {
+  const relative = path.relative(PUBLIC_DIR, filePath);
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+async function serveStatic(res, pathname, method) {
+  let decoded;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end('请求路径不合法');
+  }
+  // 统一反斜杠，防止 Windows 下 %5c 绕过
+  const relative = decoded.replace(/\\/g, '/').replace(/^\/+/, '');
   let filePath = path.resolve(PUBLIC_DIR, relative || 'index.html');
 
-  if (!filePath.startsWith(PUBLIC_DIR)) {
+  if (!isInsidePublic(filePath)) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
     return res.end('禁止访问');
   }
@@ -75,11 +94,14 @@ async function serveStatic(res, pathname) {
 
   try {
     const data = await fs.readFile(filePath);
-    res.writeHead(200, {
+    const headers = {
       'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+      'Content-Length': data.length,
       'Cache-Control': 'no-cache',
-    });
-    res.end(data);
+    };
+    res.writeHead(200, headers);
+    // HEAD 只返回响应头，不带响应体
+    res.end(method === 'HEAD' ? undefined : data);
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('资源不存在');
@@ -101,7 +123,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('方法不允许');
       }
-      return await serveStatic(res, pathname);
+      return await serveStatic(res, pathname, method);
     }
 
     const year = searchParams.get('year') || currentYear();
@@ -188,8 +210,12 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 404, { message: `接口不存在：${pathname}` });
   } catch (err) {
     const status = err.status || 500;
-    if (status >= 500) console.error('[error]', err);
-    return sendJson(res, status, { message: err.message || '服务器内部错误' });
+    if (status >= 500) {
+      // 内部错误只记录日志，不把细节返回给客户端（避免泄露路径 / SQL 等信息）
+      console.error(`[error] ${method} ${pathname}`, err);
+      return sendJson(res, 500, { message: '服务器内部错误' });
+    }
+    return sendJson(res, status, { message: err.message || '请求不合法' });
   }
 });
 

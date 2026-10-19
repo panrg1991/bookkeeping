@@ -70,6 +70,16 @@ function centsToYuanInput(cents) {
 
 /* ------------------------- 导入 / 导出用的解析与生成 ------------------------- */
 
+/** 防 CSV 公式注入：以 = + @ 或制表符开头的单元格前置单引号；
+ *  负号开头仅在不是纯数字时才处理，避免把负数金额误判为公式 */
+function csvSafe(value) {
+  const text = String(value == null ? '' : value);
+  if (/^[=+@\t\r]/.test(text) || (/^-/.test(text) && !/^-?\d+(\.\d+)?$/.test(text))) {
+    return `'${text}`;
+  }
+  return text;
+}
+
 /** 记录数组 -> CSV 文本（导出到剪贴板，粘贴进 Excel 即可） */
 function toCsv(records) {
   const lines = [['日期', '类型', '分类', '金额', '备注'].join(',')];
@@ -81,7 +91,7 @@ function toCsv(records) {
       `${item.type === 'income' ? '' : '-'}${(item.amountCents / 100).toFixed(2)}`,
       item.note,
     ].map((cell) => {
-      const text = String(cell == null ? '' : cell);
+      const text = csvSafe(cell);
       return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
     });
     lines.push(cells.join(','));
@@ -89,15 +99,29 @@ function toCsv(records) {
   return lines.join('\r\n');
 }
 
-/** 解析各种日期写法为 YYYY-MM-DD，无法识别时返回 null */
+/** 单笔金额 / 单价上限（分），与后端 db.js、云函数保持一致 */
+const MAX_AMOUNT_CENTS = 1e14;
+
+/** 校验是否为真实存在的日历日期（如 2026-02-30、2026-13-01 均视为非法） */
+function isValidDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  const ts = new Date(Date.UTC(y, m - 1, d));
+  return ts.getUTCFullYear() === y && ts.getUTCMonth() === m - 1 && ts.getUTCDate() === d;
+}
+
+/** 解析各种日期写法为 YYYY-MM-DD，无法识别或不是有效日期时返回 null */
 function toDateString(value) {
   if (value == null) return null;
   const text = String(value).trim();
+  let result = null;
   let match = text.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?$/);
-  if (match) return `${match[1]}-${pad2(Number(match[2]))}-${pad2(Number(match[3]))}`;
-  match = text.match(/^(\d{4})(\d{2})(\d{2})$/);
-  if (match) return `${match[1]}-${match[2]}-${match[3]}`;
-  return null;
+  if (match) result = `${match[1]}-${pad2(Number(match[2]))}-${pad2(Number(match[3]))}`;
+  else {
+    match = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (match) result = `${match[1]}-${match[2]}-${match[3]}`;
+  }
+  return result && isValidDate(result) ? result : null;
 }
 
 /** 解析类型写法为 income / expense，无法识别时返回 null */
@@ -121,6 +145,8 @@ module.exports = {
   pad2,
   todayStr,
   weekday,
+  isValidDate,
+  MAX_AMOUNT_CENTS,
   formatMoney,
   formatSigned,
   formatPercent,

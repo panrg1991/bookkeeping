@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
+const budget = require('./budget');
 
 const DATA_DIR = path.join(__dirname, 'data');
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -95,12 +96,20 @@ function normalizeMonth(value) {
   return String(month).padStart(2, '0');
 }
 
-/** 生成按年 / 按年月的过滤条件 */
+/** 生成按年 / 按年月的过滤条件。
+ *  日期以 YYYY-MM-DD 文本存储，字典序与时间序一致，因此用范围比较可命中 idx_records_date，
+ *  避免 substr(column, ...) 导致全表扫描。 */
 function periodFilter(year, month, column = 'date') {
   const y = normalizeYear(year);
   const m = normalizeMonth(month);
-  if (m === null) return { sql: `substr(${column}, 1, 4) = ?`, params: [y] };
-  return { sql: `substr(${column}, 1, 7) = ?`, params: [`${y}-${m}`] };
+  if (m === null) {
+    return { sql: `${column} >= ? AND ${column} <= ?`, params: [`${y}-01-01`, `${y}-12-31`] };
+  }
+  const lastDay = new Date(Number(y), Number(m), 0).getDate();
+  return {
+    sql: `${column} >= ? AND ${column} <= ?`,
+    params: [`${y}-${m}-01`, `${y}-${m}-${String(lastDay).padStart(2, '0')}`],
+  };
 }
 
 /** 金额统一以“分”为单位的整数存储，避免浮点误差 */
@@ -374,53 +383,27 @@ function overview(year, month) {
 
 /* ------------------------------- 支出预警额度 ------------------------------- */
 
+/** 从数据库读取「已设置额度」表：{ 'YYYY-MM': 分 } */
+function readStoredBudgets() {
+  const rows = db.prepare('SELECT month, amount_cents FROM budgets WHERE amount_cents > 0').all();
+  const stored = {};
+  rows.forEach((row) => {
+    stored[row.month] = row.amount_cents;
+  });
+  return stored;
+}
+
 /**
  * 计算某年 12 个月的「生效预警额度」（分）：
  * 当月设置过就用当月的；没设置则沿用**最近一次设置**的值（可跨月、跨年）；都没有则为 0（不预警）
+ * 纯计算逻辑见 ./budget.js（与小程序本地存储、云函数共享同一份规则）。
  */
 function buildBudgetMap(year) {
-  const y = Number(year);
-  const rows = db.prepare('SELECT month, amount_cents FROM budgets WHERE amount_cents > 0').all();
-  const self = {};
-  rows.forEach((row) => {
-    if (/^\d{4}-\d{2}$/.test(row.month) && row.month <= `${y}-12`) {
-      self[row.month] = row.amount_cents;
-    }
-  });
-
-  const setMonths = Object.keys(self).sort();
-  const result = {};
-
-  for (let m = 1; m <= 12; m += 1) {
-    const key = `${y}-${String(m).padStart(2, '0')}`;
-    const own = self[key] || 0;
-    let from = '';
-    if (!own) {
-      for (let i = setMonths.length - 1; i >= 0; i -= 1) {
-        if (setMonths[i] < key) {
-          from = setMonths[i];
-          break;
-        }
-      }
-    }
-    result[key] = {
-      month: key,
-      budgetValue: own,
-      budget: own > 0 ? own : (from ? self[from] : 0),
-      budgetFrom: own > 0 ? '' : from,
-    };
-  }
-
-  return result;
+  return budget.buildBudgetMap(year, readStoredBudgets());
 }
 
 /** 支出预警：超过额度 over（红）；达到额度 95% near（黄） */
-function budgetAlert(expenseCents, budgetCents) {
-  if (!(budgetCents > 0)) return 'none';
-  if (expenseCents > budgetCents) return 'over';
-  if (expenseCents >= budgetCents * 0.95) return 'near';
-  return 'none';
-}
+const budgetAlert = budget.budgetAlert;
 
 /** 某年 12 个月的预警额度（含沿用来源） */
 function getBudgets(year) {
@@ -436,7 +419,10 @@ function setBudget(month, amount) {
   const key = String(month || '').trim();
   if (!/^\d{4}-\d{2}$/.test(key)) throw httpError(400, '月份格式应为 YYYY-MM');
 
-  const cents = Math.max(0, Math.round((Number(amount) || 0) * 100));
+  const raw = amount === undefined || amount === null || amount === '' ? 0 : Number(amount);
+  if (!Number.isFinite(raw)) throw httpError(400, '额度必须是有效数字');
+  if (raw < 0) throw httpError(400, '额度不能为负数');
+  const cents = Math.round(raw * 100);
   if (cents > 1e14) throw httpError(400, '额度超出合理范围');
 
   if (cents > 0) {
@@ -461,11 +447,11 @@ function monthlySummary(year) {
               COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents END), 0) AS expense,
               COUNT(*) AS count
        FROM records
-       WHERE substr(date, 1, 4) = ?
+       WHERE date >= ? AND date <= ?
        GROUP BY month
        ORDER BY month`
     )
-    .all(y);
+    .all(`${y}-01-01`, `${y}-12-31`);
 
   const map = new Map(rows.map((r) => [r.month, r]));
   const budgets = buildBudgetMap(y);
