@@ -49,6 +49,9 @@ Page({
     // 计算器折叠状态：默认收起为右下角悬浮按钮，点击后展开
     calcOpen: false,
 
+    // 临时图片：仅保存在页面内存中，不落盘、不上传；点击「清除」或离开页面即清空
+    tempImage: '',
+
     // 组合计算：comboKs 为已选中的组合方式（可同时选多个），结果只给一个总数
     // comboReady：输入框里有有效数字时才显示组合方式与结果
     comboInput: '',
@@ -77,6 +80,8 @@ Page({
   onHide() {
     // 切走时收起，避免下次进入仍停留在展开状态
     if (this.data.calcOpen) this.setData({ calcOpen: false });
+    // 离开页面即丢弃临时图片，下次进入需重新选择
+    if (this.data.tempImage) this.setData({ tempImage: '' });
   },
 
   /** 展开计算器 */
@@ -88,6 +93,56 @@ Page({
   /** 收起计算器 */
   closeCalc() {
     this.setData({ calcOpen: false });
+  },
+
+  /* ------------------------------ 临时图片 ------------------------------ */
+
+  /**
+   * 选择本地图片并在页面内直接展示。
+   * 只在页面 data 中保留临时路径，不写缓存、不上传，点击「清除」或离开页面即失效。
+   */
+  chooseTempImage() {
+    const showImage = (paths) => {
+      const tempImage = (paths || [])[0];
+      if (!tempImage) return;
+      this.setData({ tempImage });
+    };
+
+    if (typeof wx.chooseMedia === 'function') {
+      wx.chooseMedia({
+        count: 1,
+        mediaType: ['image'],
+        sourceType: ['album', 'camera'],
+        sizeType: ['compressed'],
+        success: (res) => showImage((res.tempFiles || []).map((file) => file.tempFilePath)),
+        fail: () => {},
+      });
+      return;
+    }
+
+    // 兼容旧基础库
+    wx.chooseImage({
+      count: 1,
+      sizeType: ['compressed'],
+      sourceType: ['album', 'camera'],
+      success: (res) => showImage(res.tempFilePaths),
+      fail: () => {},
+    });
+  },
+
+  /** 放大查看：打开系统图片预览（支持双指缩放），关闭后页面内图片仍保留 */
+  previewTempImage() {
+    const tempImage = this.data.tempImage;
+    if (!tempImage) return;
+    wx.previewImage({
+      urls: [tempImage],
+      current: tempImage,
+    });
+  },
+
+  /** 清除临时图片，需要查看时重新选择 */
+  clearTempImage() {
+    this.setData({ tempImage: '' });
   },
 
   onKeyTap(e) {

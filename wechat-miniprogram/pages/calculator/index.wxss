@@ -273,3 +273,70 @@
   color: #2563eb;
   word-break: break-all;
 }
+
+/* ------------------------------ 临时图片 ------------------------------ */
+.image-tip {
+  margin: 8rpx 0 16rpx;
+}
+
+.image-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 150rpx;
+  border: 2rpx dashed #c3cbd8;
+  border-radius: 12rpx;
+  background: #f8fafc;
+  color: #6b7280;
+  font-size: 28rpx;
+}
+
+.image-picker-hover {
+  background: #eef2f7;
+}
+
+.image-picker-plus {
+  margin-right: 8rpx;
+  font-size: 40rpx;
+  line-height: 1;
+  color: #2563eb;
+}
+
+/* 页面内直接展示临时图片，不遮挡其他区域，可边看边操作 */
+.image-preview {
+  width: 100%;
+  height: 560rpx;
+  border-radius: 12rpx;
+  background: #f8fafc;
+  border: 2rpx solid #e3e8f0;
+}
+
+.image-actions {
+  display: flex;
+  margin-top: 16rpx;
+}
+
+.image-btn {
+  flex: 1;
+  height: 76rpx;
+  line-height: 76rpx;
+  margin-right: 12rpx;
+  text-align: center;
+  border-radius: 10rpx;
+  font-size: 24rpx;
+  color: #ffffff;
+  background: #2563eb;
+}
+
+.image-btn:last-child {
+  margin-right: 0;
+}
+
+.image-btn-ghost {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.image-btn-hover {
+  opacity: 0.8;
+}

@@ -48,6 +48,25 @@
     </view>
   </view>
 
+  <view class="card">
+    <view class="card-title">临时图片</view>
+    <view class="muted image-tip">仅用于临时查看，不会保存或上传；点击「清除」或离开本页后需重新选择。</view>
+
+    <view class="image-picker" wx:if="{{!tempImage}}" bindtap="chooseTempImage" hover-class="image-picker-hover" hover-stay-time="60">
+      <text class="image-picker-plus">＋</text>
+      <text>选择本地图片</text>
+    </view>
+
+    <block wx:else>
+      <image class="image-preview" src="{{tempImage}}" mode="aspectFit" bindtap="previewTempImage" />
+      <view class="image-actions">
+        <view class="image-btn" bindtap="previewTempImage" hover-class="image-btn-hover">放大查看</view>
+        <view class="image-btn image-btn-ghost" bindtap="chooseTempImage" hover-class="image-btn-hover">重新选择</view>
+        <view class="image-btn image-btn-ghost" bindtap="clearTempImage" hover-class="image-btn-hover">清除</view>
+      </view>
+    </block>
+  </view>
+
   <view class="muted calc-hint">需要四则运算时，点击右下角「计算」。</view>
 
   <!-- 收起状态：右下角悬浮按钮 -->
