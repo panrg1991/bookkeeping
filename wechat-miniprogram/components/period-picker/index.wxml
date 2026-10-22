@@ -1,0 +1,8 @@
+<view class="period-picker">
+  <picker mode="selector" range="{{years}}" value="{{yearIndex}}" bindchange="onYearChange">
+    <view class="period-pill" hover-class="period-pill-hover" hover-stay-time="60">{{years[yearIndex]}} 年</view>
+  </picker>
+  <picker mode="selector" range="{{monthOptions}}" value="{{monthIndex}}" bindchange="onMonthChange">
+    <view class="period-pill" hover-class="period-pill-hover" hover-stay-time="60">{{monthOptions[monthIndex]}}</view>
+  </picker>
+</view>

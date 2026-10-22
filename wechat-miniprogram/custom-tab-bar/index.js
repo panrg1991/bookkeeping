@@ -1,12 +1,10 @@
+const { TABS } = require('../utils/tabs');
+
 Component({
   data: {
     selected: 0,
-    list: [
-      { pagePath: '/pages/monthly/index', text: '月度总览' },
-      { pagePath: '/pages/daily/index', text: '每日明细' },
-      { pagePath: '/pages/records/index', text: '流水记录' },
-      { pagePath: '/pages/category/index', text: '分类统计' },
-    ],
+    // 导航项统一来自 utils/tabs.js，新增 tab 时无需再改这里
+    list: TABS,
   },
 
   methods: {

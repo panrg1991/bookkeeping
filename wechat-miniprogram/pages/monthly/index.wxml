@@ -1,22 +1,14 @@
 <view class="page">
-  <view class="toolbar">
-    <picker mode="selector" range="{{years}}" value="{{yearIndex}}" bindchange="onYearChange">
-      <view class="picker">{{year}} 年</view>
-    </picker>
-    <picker mode="selector" range="{{monthOptions}}" value="{{monthIndex}}" bindchange="onMonthChange">
-      <view class="picker">{{monthOptions[monthIndex]}}</view>
-    </picker>
-  </view>
+  <period-picker
+    years="{{years}}"
+    year-index="{{yearIndex}}"
+    month-options="{{monthOptions}}"
+    month-index="{{monthIndex}}"
+    bind:yearchange="onYearChange"
+    bind:monthchange="onMonthChange"
+  />
 
-  <view class="cards">
-    <view class="metric" wx:for="{{cards}}" wx:key="label">
-      <view class="metric-inner">
-        <view class="metric-label">{{item.label}}</view>
-        <view class="metric-value {{item.cls}}">{{item.value}}</view>
-        <view class="metric-sub">{{item.sub}}</view>
-      </view>
-    </view>
-  </view>
+  <metric-grid items="{{cards}}" />
 
   <view class="card-title">{{year}} 年各月明细</view>
   <view class="muted tip">点击「预警额度」可设置当月支出额度，未设置的月份自动沿用最近一次设置的额度。支出超过额度显示红色背景，达到额度 95% 显示黄色背景。表格可左右滑动查看完整列。</view>

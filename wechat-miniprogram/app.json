@@ -4,6 +4,7 @@
     "pages/daily/index",
     "pages/records/index",
     "pages/category/index",
+    "pages/calculator/index",
     "pages/logs/index"
   ],
   "window": {
@@ -35,6 +36,10 @@
       {
         "pagePath": "pages/category/index",
         "text": "分类统计"
+      },
+      {
+        "pagePath": "pages/calculator/index",
+        "text": "计算"
       }
     ]
   },

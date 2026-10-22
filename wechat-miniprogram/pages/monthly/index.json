@@ -1,5 +1,8 @@
 {
-  "usingComponents": {},
+  "usingComponents": {
+    "period-picker": "/components/period-picker/index",
+    "metric-grid": "/components/metric-grid/index"
+  },
   "navigationBarTitleText": "月度总览",
   "enablePullDownRefresh": true,
   "backgroundTextStyle": "light"

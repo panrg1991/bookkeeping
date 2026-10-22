@@ -1,39 +1,14 @@
 <view class="page">
-  <view class="toolbar">
-    <picker mode="selector" range="{{years}}" value="{{yearIndex}}" bindchange="onYearChange">
-      <view class="picker">{{year}} 年</view>
-    </picker>
-    <picker mode="selector" range="{{monthOptions}}" value="{{monthIndex}}" bindchange="onMonthChange">
-      <view class="picker">{{monthOptions[monthIndex]}}</view>
-    </picker>
-  </view>
+  <period-picker
+    years="{{years}}"
+    year-index="{{yearIndex}}"
+    month-options="{{monthOptions}}"
+    month-index="{{monthIndex}}"
+    bind:yearchange="onYearChange"
+    bind:monthchange="onMonthChange"
+  />
 
-  <view class="cards">
-    <view class="metric">
-      <view class="metric-inner">
-        <view class="metric-label">支出合计</view>
-        <view class="metric-value expense-text">{{summary.expense}}</view>
-      </view>
-    </view>
-    <view class="metric">
-      <view class="metric-inner">
-        <view class="metric-label">收入合计</view>
-        <view class="metric-value income-text">{{summary.income}}</view>
-      </view>
-    </view>
-    <view class="metric">
-      <view class="metric-inner">
-        <view class="metric-label">净额</view>
-        <view class="metric-value {{summary.profitCls}}">{{summary.profit}}</view>
-      </view>
-    </view>
-    <view class="metric">
-      <view class="metric-inner">
-        <view class="metric-label">记账天数 / 笔数</view>
-        <view class="metric-value">{{summary.days}} / {{summary.count}}</view>
-      </view>
-    </view>
-  </view>
+  <metric-grid items="{{cards}}" />
 
   <view class="card-title">{{periodLabel}} 每日明细</view>
   <view class="muted tip">点击任意一天，可展开当天全部流水并直接修改或删除</view>

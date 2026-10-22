@@ -30,66 +30,11 @@ page {
   font-size: 24rpx;
 }
 
-/* ---------------- 指标卡 ---------------- */
-.cards {
-  display: flex;
-  flex-wrap: wrap;
-  margin-bottom: 4rpx;
-}
-
-.metric {
-  width: 50%;
-  box-sizing: border-box;
-  padding: 8rpx;
-}
-
-.metric-inner {
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: 20rpx;
-  box-shadow: 0 2rpx 12rpx rgba(16, 24, 40, 0.06);
-}
-
-.metric-label {
-  font-size: 24rpx;
-  color: #6b7280;
-}
-
-.metric-value {
-  font-size: 38rpx;
-  font-weight: 700;
-  margin-top: 8rpx;
-}
-
-.metric-sub {
-  font-size: 22rpx;
-  color: #9ca3af;
-  margin-top: 4rpx;
-}
-
-/* ---------------- 工具条 ---------------- */
-.toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 20rpx;
-}
-
-.picker {
-  background: #ffffff;
-  border: 2rpx solid #e3e8f0;
-  border-radius: 10rpx;
-  padding: 12rpx 24rpx;
-  font-size: 26rpx;
-  margin-right: 16rpx;
-  margin-bottom: 12rpx;
-}
-
-.picker::after {
-  content: "▾";
-  margin-left: 10rpx;
-  color: #9ca3af;
-}
+/* ---------------- 指标卡 / 统计周期 ---------------- */
+/* 已抽为可复用组件，页面请直接使用：
+   <metric-grid items="{{cards}}" />
+   <period-picker years year-index month-options month-index
+                  bind:yearchange bind:monthchange /> */
 
 /* ---------------- 按钮 ---------------- */
 .btn {

@@ -38,7 +38,8 @@
 | 每日明细 | 按年 / 月（含全年）查看每天支出、收入、净额；点击任意一天展开当天全部流水，可直接「改」「删」 |
 | 流水记录 | 日期 / 类型 / 金额 / 分类（快捷标签）/ 备注录入；**可切换「单价 × 数量」自动计算金额（保留两位小数）**；修改、删除；**批量管理（多选 / 全选 / 批量删除）**；类型筛选；分类备注搜索；批量导入；导出 CSV |
 | 分类统计 | 支出 / 收入两个维度，各分类金额、占比与条形图 |
-| 组合计算（在「分类统计」页内） | 输入 2~8 个数，可**同时多选**组合方式（2 个 / 3 个 / 4 个……），结果只输出**一个总数**：各组合方式的乘积之和再相加（如 `2,3,2` 选 2 个 → 2×3 + 2×2 + 3×2 = **16**）；数值按输入位置区分，重复数字算不同的数 |
+| 组合计算（在「计算」页顶部） | 输入 2~8 个数，可**同时多选**组合方式（2 个 / 3 个 / 4 个……），结果只输出**一个总数**：各组合方式的乘积之和再相加（如 `2,3,2` 选 2 个 → 2×3 + 2×2 + 3×2 = **16**）；数值按输入位置区分，重复数字算不同的数 |
+| **计算** | 独立 tab 页：顶部为组合计算；右下角「计算」按钮默认折叠，点击后展开四则运算浮层（加、减、乘、除，支持小数、正负号、退格与清空）。按输入顺序立即计算（非数学优先级），除以 0 会提示错误 |
 | **操作日志** | 新增 / 修改 / 删除 / 导入全部留痕：操作时间、变更前后数据、变更字段、失败原因、客户端版本与机型；支持按类型筛选、分页、清理旧日志 |
 | 数据导出 | 「导出 CSV」把当前筛选结果写入剪贴板，粘贴到 Excel 即可 |
 | **备份 / 恢复** | 一键把全部记录（含分类字典）复制为 JSON 文本；换手机时粘贴即可「覆盖恢复」或「合并恢复」 |
@@ -48,19 +49,24 @@
 ## 目录结构
 
 ```
-app.js / app.json / app.wxss     小程序入口、四个 tabBar 页面配置、全局样式
-custom-tab-bar/                  自定义底部导航（顶部边框与内容区隔开、导航项之间竖线分隔）
+app.js / app.json / app.wxss     小程序入口、五个 tabBar 页面配置、全局样式
+custom-tab-bar/                  自定义底部导航（读取 utils/tabs.js，点击项与选中态自动同步）
+components/period-picker/        通用「年 / 月」选择条（各统计页复用）
+components/metric-grid/          通用指标卡网格（月度 / 每日页复用）
 utils/config.js                  模式开关（mode: local / cloud）、云环境 ID、云函数名
+utils/tabs.js                    底部导航配置（唯一 JS 数据源）与按路由同步选中项
 utils/store.js                   数据层门面：按 mode 选择实现，统一对外 Promise 接口
 utils/store.local.js             本地存储实现（当前启用）
 utils/store.cloud.js             云开发实现（调用云函数，切回云模式时使用）
 utils/format.js                  金额（分 -> 元，带千分位）、日期、CSV、粘贴解析等纯工具
 utils/budget.js                  每月支出预警额度：纯计算逻辑（与 Node 后端、云函数保持同一份规则）
 utils/combine.js                 组合计算工具（从若干个数中任选 k 个，求组合乘积之和）
+utils/calculator.js              计算器核心逻辑（四则运算状态机，纯函数）
 pages/monthly/                   月度总览
 pages/daily/                     每日明细
 pages/records/                   流水记录（录入 / 修改 / 删除 / 导入 / 导出）
 pages/category/                  分类统计
+pages/calculator/                计算（顶部组合计算 + 右下角可折叠四则运算）
 pages/logs/                      操作日志（排查用）
 cloudfunctions/bookkeeping/      统一业务云函数（云模式使用，本地模式不加载）
 docs/deploy-checklist.md         部署配置清单（改哪些配置、模式切换、报错对照）
@@ -70,6 +76,21 @@ docs/cloud-database.md           云数据库设计与部署（集合、权限�
 docs/release.md                  发布上线指引（AppID、审核、发布步骤）
 project.config.json              微信开发者工具工程配置
 ```
+
+## 扩展：新增功能页面
+
+界面已按「可复用组件 + 配置化导航」组织，新增页面时尽量复用现有能力：
+
+- **新增一个 tab 页**：
+  1. `app.json` 的 `pages` 中登记页面路径；
+  2. `app.json` 的 `tabBar.list` 中按顺序补一项（微信平台的静态要求）；
+  3. `utils/tabs.js` 的 `TABS` 中补一项，顺序与 `tabBar.list` 保持一致。
+  页面 `onShow` 中调用 `tabs.sync(this)` 即可自动高亮当前项，**不用再硬编码 `selected` 下标**。
+- **新增页面内的指标卡 / 统计周期**：直接复用 `<metric-grid items="{{cards}}" />` 与 `<period-picker ... />`，并在页面 `index.json` 的 `usingComponents` 中登记即可。
+- **新增通用 UI**：放到 `components/` 下，使用它的页面在 `index.json` 中登记；组件如需使用 `app.wxss` 的全局颜色类（如 `income-text`），在组件 `options` 中设置 `addGlobalClass: true`。
+
+> - `app.json` 是静态 JSON、无法 `require`，因此 tab 的顺序仍要在 `app.json` 与 `utils/tabs.js` 各维护一次。
+> - 微信 `tabBar.list` 最多 **5** 项，当前已用满（月度总览 / 每日明细 / 流水记录 / 分类统计 / 计算）。后续新功能页建议作为普通页面，用 `wx.navigateTo` 从现有页面进入，而不是再加 tab。
 
 ## 数据存储与接口调用
 

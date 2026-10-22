@@ -31,6 +31,11 @@
   font-weight: 600;
 }
 
+/* 点击反馈：轻触时给出浅色底，提升可点性感知 */
+.tab-item-hover {
+  background: #f8fafc;
+}
+
 /* 选中项顶部指示条 */
 .tab-item.active::after {
   content: '';

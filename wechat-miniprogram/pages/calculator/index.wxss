@@ -1,0 +1,275 @@
+/* 折叠状态：右下角悬浮按钮 */
+.calc-fab {
+  position: fixed;
+  right: 32rpx;
+  bottom: 190rpx;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  height: 88rpx;
+  padding: 0 30rpx;
+  border-radius: 44rpx;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 28rpx;
+  box-shadow: 0 8rpx 24rpx rgba(37, 99, 235, 0.35);
+}
+
+.calc-fab-plus {
+  margin-right: 8rpx;
+  font-size: 34rpx;
+  line-height: 1;
+}
+
+.calc-fab-hover {
+  opacity: 0.85;
+}
+
+/* 展开状态：右下角上方的计算器浮层 */
+.calc-panel {
+  position: fixed;
+  right: 24rpx;
+  bottom: 200rpx;
+  width: 702rpx;
+  box-sizing: border-box;
+  z-index: 120;
+  padding: 20rpx 24rpx 24rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  box-shadow: 0 12rpx 40rpx rgba(15, 23, 42, 0.22);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(24rpx) scale(0.98);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+}
+
+.calc-panel.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.calc-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.calc-panel-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.calc-panel-close {
+  font-size: 26rpx;
+  color: #2563eb;
+}
+
+.calc-hint {
+  margin-top: 4rpx;
+  text-align: center;
+}
+
+/* 显示屏：白底黑字 + 右对齐，突出结果 */
+.calc-screen {
+  background: #ffffff;
+  border: 2rpx solid #e3e8f0;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+}
+
+.calc-expression {
+  min-height: 36rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+  text-align: right;
+  line-height: 36rpx;
+  word-break: break-all;
+}
+
+.calc-display {
+  margin-top: 8rpx;
+  font-size: 60rpx;
+  font-weight: 600;
+  color: #111827;
+  text-align: right;
+  line-height: 1.3;
+  word-break: break-all;
+}
+
+.calc-display-error {
+  font-size: 44rpx;
+  color: #dc2626;
+}
+
+.calc-keys {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.calc-key {
+  width: 25%;
+  box-sizing: border-box;
+  padding: 8rpx;
+}
+
+.calc-key.span-2 {
+  width: 50%;
+}
+
+.calc-key-inner {
+  height: 96rpx;
+  line-height: 92rpx; /* 减去上下 2rpx 边框，保证文字垂直居中 */
+  text-align: center;
+  border-radius: 12rpx;
+  font-size: 34rpx;
+  color: #1f2937;
+  background: #ffffff;
+  border: 2rpx solid #e3e8f0;
+}
+
+.calc-key.fn .calc-key-inner {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.calc-key.op .calc-key-inner {
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.calc-key.equals .calc-key-inner {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.calc-key-hover .calc-key-inner {
+  opacity: 0.7;
+}
+
+.calc-tip {
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+/* ------------------------------ 组合计算 ------------------------------ */
+.combo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.combo-head .card-title {
+  margin-bottom: 0;
+}
+
+.combo-clear {
+  font-size: 26rpx;
+  color: #2563eb;
+}
+
+.combo-tip {
+  margin: 10rpx 0 16rpx;
+}
+
+.combo-input {
+  display: block;
+  width: 100%;
+  /* 固定高度：避免 auto-height 在聚焦时重算高度导致键盘闪烁；内容超出时组件内部滚动 */
+  height: 160rpx;
+  box-sizing: border-box;
+  padding: 16rpx 20rpx;
+  background: #f8fafc;
+  border: 2rpx solid #e3e8f0;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  line-height: 1.5;
+}
+
+.combo-placeholder {
+  color: #9ca3af;
+  font-size: 28rpx;
+}
+
+/* 组合方式与结果固定占位：高度恒定，输入数字后下方计算器不会被顶下去。
+   内容超出时在区域内滚动，保证固定高度不会被撑开。 */
+.combo-dynamic {
+  height: 380rpx;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.combo-dynamic-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 24rpx;
+  color: #9ca3af;
+}
+
+.combo-pick-tip {
+  margin: 18rpx 0 8rpx;
+}
+
+.combo-ks {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.combo-k {
+  padding: 10rpx 22rpx;
+  margin: 0 12rpx 12rpx 0;
+  border: 2rpx solid #e3e8f0;
+  border-radius: 10rpx;
+  font-size: 26rpx;
+  color: #374151;
+  background: #ffffff;
+}
+
+.combo-k.on {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.combo-k.off {
+  color: #c3cbd8;
+  background: #f8fafc;
+}
+
+.combo-error {
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  color: #dc2626;
+}
+
+.combo-notice {
+  margin-top: 12rpx;
+}
+
+.combo-result {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20rpx;
+  padding: 20rpx;
+  background: #eff6ff;
+  border-radius: 12rpx;
+}
+
+.combo-sum {
+  margin-top: 6rpx;
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #2563eb;
+  word-break: break-all;
+}

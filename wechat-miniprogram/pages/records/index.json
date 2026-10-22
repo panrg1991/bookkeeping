@@ -1,5 +1,7 @@
 {
-  "usingComponents": {},
+  "usingComponents": {
+    "period-picker": "/components/period-picker/index"
+  },
   "navigationBarTitleText": "流水记录",
   "enablePullDownRefresh": true,
   "backgroundTextStyle": "light"

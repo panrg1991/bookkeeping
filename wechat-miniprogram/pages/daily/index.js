@@ -1,5 +1,6 @@
 const store = require('../../utils/store');
 const fmt = require('../../utils/format');
+const tabs = require('../../utils/tabs');
 
 const MONTH_OPTIONS = ['全年', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
@@ -26,15 +27,13 @@ Page({
     monthIndex: 0,
     periodLabel: '',
     days: [],
-    summary: {},
+    cards: [],
     hasData: false,
   },
 
   onShow() {
-    // 同步自定义 tabBar 的选中项
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 1 });
-    }
+    // 按路由同步自定义 tabBar 的选中项（无需关心自己是第几个 tab）
+    tabs.sync(this);
     this.refresh();
   },
 
@@ -162,6 +161,14 @@ Page({
       );
       const profit = sum.income - sum.expense;
 
+      // 指标卡数据：新增指标只需往数组里加一项，模板无需改动
+      const cards = [
+        { label: '支出合计', value: fmt.formatMoney(sum.expense), cls: 'expense-text' },
+        { label: '收入合计', value: fmt.formatMoney(sum.income), cls: 'income-text' },
+        { label: '净额', value: fmt.formatSigned(profit), cls: fmt.moneyClass(profit) },
+        { label: '记账天数 / 笔数', value: `${list.length} / ${sum.count}` },
+      ];
+
       this.setData({
         years,
         year,
@@ -169,15 +176,8 @@ Page({
         monthIndex,
         periodLabel,
         days,
+        cards,
         hasData: list.length > 0,
-        summary: {
-          income: fmt.formatMoney(sum.income),
-          expense: fmt.formatMoney(sum.expense),
-          profit: fmt.formatSigned(profit),
-          profitCls: fmt.moneyClass(profit),
-          days: list.length,
-          count: sum.count,
-        },
       });
     } catch (err) {
       wx.showToast({ title: err.message, icon: 'none' });

@@ -1,0 +1,27 @@
+.period-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20rpx;
+}
+
+.period-pill {
+  background: #ffffff;
+  border: 2rpx solid #e3e8f0;
+  border-radius: 10rpx;
+  padding: 12rpx 24rpx;
+  font-size: 26rpx;
+  color: #1f2937;
+  margin-right: 16rpx;
+  margin-bottom: 12rpx;
+}
+
+.period-pill::after {
+  content: "▾";
+  margin-left: 10rpx;
+  color: #9ca3af;
+}
+
+.period-pill-hover {
+  background: #f1f5f9;
+}

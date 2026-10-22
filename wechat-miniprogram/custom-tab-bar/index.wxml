@@ -5,5 +5,7 @@
     wx:key="pagePath"
     data-index="{{index}}"
     bindtap="onTap"
+    hover-class="tab-item-hover"
+    hover-stay-time="60"
   >{{item.text}}</view>
 </view>

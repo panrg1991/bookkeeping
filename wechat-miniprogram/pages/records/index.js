@@ -1,5 +1,6 @@
 const store = require('../../utils/store');
 const fmt = require('../../utils/format');
+const tabs = require('../../utils/tabs');
 
 const MONTH_OPTIONS = ['全年', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
@@ -107,10 +108,8 @@ Page({
   },
 
   async onShow() {
-    // 同步自定义 tabBar 的选中项
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 2 });
-    }
+    // 按路由同步自定义 tabBar 的选中项（无需关心自己是第几个 tab）
+    tabs.sync(this);
 
     const globalData = getApp().globalData;
 

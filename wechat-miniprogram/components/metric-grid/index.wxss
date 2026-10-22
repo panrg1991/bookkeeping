@@ -1,0 +1,60 @@
+.metric-grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 4rpx;
+}
+
+.metric {
+  display: flex;
+  width: 50%;
+  box-sizing: border-box;
+  padding: 8rpx;
+}
+
+.metric-inner {
+  flex: 1;
+  box-sizing: border-box;
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(16, 24, 40, 0.06);
+}
+
+.metric-label {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.metric-value {
+  font-size: 38rpx;
+  font-weight: 700;
+  margin-top: 8rpx;
+  word-break: break-all;
+}
+
+.metric-sub {
+  font-size: 22rpx;
+  color: #9ca3af;
+  margin-top: 4rpx;
+}
+
+/* 颜色类与 app.wxss 保持一致（组件样式隔离时也能正常着色） */
+.income-text {
+  color: #dc2626;
+}
+
+.expense-text {
+  color: #16a34a;
+}
+
+.profit-text {
+  color: #2563eb;
+}
+
+.negative {
+  color: #dc2626;
+}
+
+.zero {
+  color: #9ca3af;
+}

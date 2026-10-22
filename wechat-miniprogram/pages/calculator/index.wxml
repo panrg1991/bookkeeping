@@ -1,0 +1,94 @@
+<view class="page">
+  <view class="card">
+    <view class="combo-head">
+      <text class="card-title">组合计算</text>
+      <text class="combo-clear" wx:if="{{comboInput}}" bindtap="onComboClear">清空</text>
+    </view>
+    <view class="muted combo-tip">输入 2~8 个数（逗号、空格或换行分隔），可同时选择多种组合方式，结果为它们各自的组合乘积之和相加。</view>
+
+    <!-- 不使用 auto-height：auto-height 会在首次聚焦时重算高度（原生组件重排），
+         与键盘弹出时的页面位移叠加会出现一次“键盘闪烁”。固定高度可让聚焦前后布局稳定。 -->
+    <textarea
+      class="combo-input"
+      value="{{comboInput}}"
+      placeholder="例如：2,3,2"
+      placeholder-class="combo-placeholder"
+      maxlength="1000"
+      cursor-spacing="24"
+      disable-default-padding="{{true}}"
+      bindinput="onComboInput"
+    />
+
+    <!-- 固定高度：组合方式与结果在此区域内出现/消失，避免输入数字后把下方计算器顶下去 -->
+    <view class="combo-dynamic">
+      <block wx:if="{{comboReady}}">
+        <view class="muted combo-pick-tip">组合方式（可多选）</view>
+        <view class="combo-ks">
+          <view
+            class="combo-k {{item.active ? 'on' : ''}} {{item.enabled ? '' : 'off'}}"
+            wx:for="{{comboOptions}}"
+            wx:key="k"
+            data-k="{{item.k}}"
+            bindtap="onComboKToggle"
+          >{{item.k}} 个数</view>
+        </view>
+      </block>
+
+      <view class="combo-error" wx:if="{{comboError}}">{{comboError}}</view>
+      <view class="muted combo-notice" wx:if="{{comboNotice}}">{{comboNotice}}</view>
+
+      <view class="combo-result" wx:if="{{comboSum}}">
+        <text class="muted">{{comboLabel}} 个数组合 · 共 {{comboCount}} 组 · 乘积之和</text>
+        <text class="combo-sum">{{comboSum}}</text>
+      </view>
+
+      <view class="combo-dynamic-empty" wx:if="{{!comboReady && !comboError && !comboNotice}}">
+        输入数字后，这里会显示组合方式与结果
+      </view>
+    </view>
+  </view>
+
+  <view class="muted calc-hint">需要四则运算时，点击右下角「计算」。</view>
+
+  <!-- 收起状态：右下角悬浮按钮 -->
+  <view
+    class="calc-fab"
+    wx:if="{{!calcOpen}}"
+    bindtap="openCalc"
+    hover-class="calc-fab-hover"
+    hover-stay-time="60"
+  >
+    <text class="calc-fab-plus">＋</text>
+    <text>计算</text>
+  </view>
+
+  <!-- 展开状态：右下角上方的计算器浮层 -->
+  <view class="calc-panel {{calcOpen ? 'open' : ''}}">
+    <view class="calc-panel-head">
+      <text class="calc-panel-title">计算</text>
+      <text class="calc-panel-close" bindtap="closeCalc">收起</text>
+    </view>
+
+    <view class="calc-screen">
+      <view class="calc-expression">{{expression}}</view>
+      <view class="calc-display {{hasError ? 'calc-display-error' : ''}}">{{display}}</view>
+    </view>
+
+    <view class="calc-keys">
+      <view
+        class="calc-key {{item.cls}}"
+        wx:for="{{keys}}"
+        wx:key="label"
+        data-type="{{item.type}}"
+        data-value="{{item.value}}"
+        bindtap="onKeyTap"
+        hover-class="calc-key-hover"
+        hover-stay-time="60"
+      >
+        <view class="calc-key-inner">{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="calc-tip">支持加 +、减 -、乘 ×、除 ÷ 与小数；C 清空，⌫ 退格</view>
+  </view>
+</view>
